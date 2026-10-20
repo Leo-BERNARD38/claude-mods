@@ -28,7 +28,7 @@ test('serveur MCP le plus lourd, outils non chargés exclus', async () => {
   const top = topMcp([
     { serverName: 'github', tokens: 9000, isLoaded: true },
     { serverName: 'github', tokens: 4000, isLoaded: true },
-    { serverName: 'Kizamene', tokens: 5000, isLoaded: true },
+    { serverName: 'figma', tokens: 5000, isLoaded: true },
     { serverName: 'gmail', tokens: 20000, isLoaded: false },
   ])
   expect(top).toEqual({ name: 'github', tokens: 13000 })
