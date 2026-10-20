@@ -1,0 +1,27 @@
+{
+  "name": "usage-pace",
+  "version": "1.2.0",
+  "description": "Bandeau des limites Session / Semaine, contexte et session, plus un garde-fou : Claude lit ses quotas, se met en pause au seuil et reprend au reset",
+  "author": { "name": "Léo" },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "seuil": {
+      "type": "number",
+      "title": "Seuil de ralentissement (%)",
+      "description": "Au-dessus, Claude reçoit un rappel : finir l'étape, noter l'avancement, s'arrêter",
+      "default": 80
+    },
+    "seuil_arret": {
+      "type": "number",
+      "title": "Seuil d'arrêt (%)",
+      "description": "Au-dessus, les outils sont refusés (sauf Write/Edit pour noter l'avancement)",
+      "default": 90
+    },
+    "reprise_auto": {
+      "type": "boolean",
+      "title": "Reprise automatique",
+      "description": "Relancer la tâche tout seul quand la fenêtre est repartie",
+      "default": true
+    }
+  }
+}

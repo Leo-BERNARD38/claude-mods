@@ -1,0 +1,80 @@
+// Jauges en SVG pour l'app desktop : la même donnée que les barres en caractères du terminal.
+// Les couleurs sont choisies pour rester lisibles en thème clair comme en thème sombre.
+import type { Meter, Tone } from './format'
+
+export const HEX: Record<Tone, string> = {
+  ok: '#30a46c',
+  warn: '#d99a0b',
+  bad: '#e5484d',
+  dim: '#8b8d98',
+  mark: '#8b8d98',
+  claude: '#0ea5c6',
+  tools: '#a855f7',
+  you: '#f59e0b',
+  blue: '#3b82f6',
+}
+
+/** Taille d'une jauge, en pixels CSS. */
+export const METER = { width: 112, height: 14, bar: 6 }
+
+const TRACK = `fill="${HEX.dim}" fill-opacity="0.25"`
+
+function clamp(x: number): number {
+  return Math.min(100, Math.max(0, x))
+}
+
+function round(x: number): number {
+  return Math.round(x * 10) / 10
+}
+
+/** Le SVG d'une jauge, et sa description pour qui ne la voit pas. */
+export function meterSvg(meter: Meter, label: string): { source: string; alt: string } {
+  const { width: w, height: h, bar } = METER
+  const y = (h - bar) / 2
+  const r = bar / 2
+  const open = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">`
+  const clip = `<clipPath id="c"><rect x="0" y="${y}" width="${w}" height="${bar}" rx="${r}"/></clipPath>`
+
+  if (meter.kind === 'gauge') {
+    const fill = round((clamp(meter.pct) / 100) * w)
+    const parts = [
+      open,
+      clip,
+      `<g clip-path="url(#c)"><rect x="0" y="${y}" width="${w}" height="${bar}" ${TRACK}/>`,
+      `<rect x="0" y="${y}" width="${fill}" height="${bar}" fill="${HEX[meter.tone]}"/></g>`,
+    ]
+    let alt = `${label} : ${Math.round(meter.pct)} %`
+    if (meter.marker !== undefined) {
+      // le repère du temps écoulé dépasse de la barre, pour se lire même sur la partie remplie
+      const x = round(Math.min(w - 2, Math.max(0, (clamp(meter.marker) / 100) * w - 1)))
+      parts.push(`<rect x="${x}" y="0" width="2" height="${h}" rx="1" fill="${HEX.mark}"/>`)
+      alt += `, temps écoulé ${Math.round(meter.marker)} %`
+    }
+    return { source: parts.join('') + '</svg>', alt }
+  }
+
+  const total = meter.parts.reduce((sum, p) => sum + p.value, 0)
+  const parts = [
+    open,
+    clip,
+    `<g clip-path="url(#c)"><rect x="0" y="${y}" width="${w}" height="${bar}" ${TRACK}/>`,
+  ]
+  let x = 0
+  for (const p of meter.parts) {
+    if (!total || p.value <= 0) continue
+    const pw = (p.value / total) * w
+    // 1 px d'écart entre deux parts, pour les distinguer quand les couleurs sont proches
+    parts.push(
+      `<rect x="${round(x)}" y="${y}" width="${round(Math.max(0, pw - 1))}" height="${bar}" fill="${HEX[p.tone]}"/>`,
+    )
+    x += pw
+  }
+  parts.push('</g></svg>')
+  const alt =
+    `${label} : ` +
+    meter.parts
+      .filter(p => p.value > 0)
+      .map(p => `${p.name} ${total ? Math.round((p.value / total) * 100) : 0} %`)
+      .join(', ')
+  return { source: parts.join(''), alt }
+}

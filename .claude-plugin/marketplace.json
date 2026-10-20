@@ -1,0 +1,14 @@
+{
+  "name": "claude-mods",
+  "owner": {
+    "name": "Léo"
+  },
+  "description": "Mods Claude Code de Léo",
+  "plugins": [
+    {
+      "name": "usage-pace",
+      "source": "./usage-pace",
+      "description": "Bandeau des limites Session / Semaine, et garde-fou : Claude lit ses quotas, se met en pause au seuil et reprend au reset"
+    }
+  ]
+}
