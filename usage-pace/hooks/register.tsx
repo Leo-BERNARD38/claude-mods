@@ -4,7 +4,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, SessionUsage, Timer, ToolCallInput } from 'claude-code'
 
 import type { SessionStats, UsageSnapshot } from '../types'
-import { band, bandApp, waiting } from './band'
+import { band, bandApp, layoutFor, waiting } from './band'
 import { groupParts, nextSeries, topMcp } from './context'
 import { REMIND_EVERY, TOOL, config, guardStatus, reminder, report, resumePrompt, stopDenial } from './guard'
 import type { GuardConfig } from './guard'
@@ -21,8 +21,6 @@ const guard = atom({ plugin: 'usage-pace', key: 'guard' } as const, { calls: 0, 
 
 /** Redessin périodique, pour que les comptes à rebours avancent même sans activité. */
 const REFRESH_MS = 60_000
-/** En dessous de cette largeur, le bandeau passe en version courte. */
-const COMPACT_BELOW = 110
 const ALERT_MS = 8000
 const ALERTS_KEPT = 20
 
@@ -283,10 +281,11 @@ export const register: Register = (on, options) => {
     const kit = $.ui.resolve(e)
 
     if (!snap || (!snap.limits.length && snap.ctx === undefined)) return waiting(kit)
-    const compact = e.props.bodyColumns < COMPACT_BELOW
-    const lines = rows(snap, current, await $.clock.now(), compact)
+    // plus le bandeau est étroit (panneau latéral), moins il en dit
+    const layout = layoutFor(e.props.bodyColumns)
+    const lines = rows(snap, current, await $.clock.now(), layout !== 'wide')
     // dans l'app desktop : de vraies jauges ; ailleurs, les barres en caractères
-    if (e.surface === 'desktop') return bandApp($.ui.resolve(e), lines, compact)
-    return band(kit, lines, compact)
+    if (e.surface === 'desktop') return bandApp($.ui.resolve(e), lines, layout)
+    return band(kit, lines, layout)
   })
 }

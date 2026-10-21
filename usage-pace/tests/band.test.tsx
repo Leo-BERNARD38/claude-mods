@@ -94,6 +94,28 @@ test('le bandeau s’affiche sur terminal et desktop', async ($, on) => {
   }
 })
 
+test('panneau étroit : chaque ligne passe sur deux, puis ne garde que l’essentiel', async ($, on) => {
+  engine(on)
+  await $.session.measure({ context: CONTEXT, rateLimits: RATE_LIMITS, changed: ['context', 'rateLimits'] })
+  for (const surface of ['terminal', 'desktop'] as const) {
+    // étroit : libellé, barre, % sur la ligne du haut ; verdict et détails dessous
+    let ui = await $.ui.mount({ ...BAND, surface, props: { ...BAND.props, bodyColumns: 60 } })
+    const session = columns(await ui.drawn())[0] ?? []
+    expect(session.length).toBe(2)
+    expect(await ui.find({ type: 'Text', text: /dans le rythme/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /reste 34% pour 2j9h/ })).toBeDefined()
+    await ui.unmount()
+
+    // minuscule : plus de détails sous les limites, le verdict reste
+    ui = await $.ui.mount({ ...BAND, surface, props: { ...BAND.props, bodyColumns: 40 } })
+    expect(await ui.find({ type: 'Text', text: /dans le rythme/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /reste 34%/ })).toBeUndefined()
+    // le contexte, sans verdict, garde son détail
+    expect(await ui.find({ type: 'Text', text: /22k \/ 200k tokens/ })).toBeDefined()
+    await ui.unmount()
+  }
+})
+
 test('/rythme répond en texte', async ($, on) => {
   engine(on)
   const r = await $.command.run({
