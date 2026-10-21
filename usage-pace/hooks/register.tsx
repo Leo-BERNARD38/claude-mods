@@ -24,6 +24,9 @@ const REFRESH_MS = 60_000
 const ALERT_MS = 8000
 const ALERTS_KEPT = 20
 
+/** Le dernier dessin du bandeau, pour le diagnostic de /rythme : sur quelle surface, à quelle largeur. */
+let lastDraw: { surface: string; columns: number } | undefined
+
 /** Un sous-agent, c'est Claude qui réfléchit : son temps reste du côté de Claude. */
 const AGENT_TOOLS = new Set(['Agent', 'Task'])
 
@@ -270,7 +273,12 @@ export const register: Register = (on, options) => {
     const garde = report(snap.limits, cfg, now, (await read($, guard)).paused)
       .split('\n')
       .filter(l => !l.startsWith('- '))
-    return { text: [summary(snap, await read($, stats), now), ...garde].join('\n') }
+    const surfaces = (await $.session.surfaces().catch(() => [])).join(', ') || 'aucune'
+    const drawn = lastDraw
+      ? `dessiné pour ${lastDraw.surface} sur ${lastDraw.columns} colonnes`
+      : 'pas encore dessiné'
+    const affichage = `Affichage (usage-pace 1.4.2) : bandeau ${drawn} ; surfaces de la session : ${surfaces}`
+    return { text: [summary(snap, await read($, stats), now), ...garde, affichage].join('\n') }
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
@@ -281,6 +289,7 @@ export const register: Register = (on, options) => {
     const kit = $.ui.resolve(e)
 
     if (!snap || (!snap.limits.length && snap.ctx === undefined)) return waiting(kit)
+    lastDraw = { surface: e.surface, columns: e.props.bodyColumns }
     // en pleine largeur tout le texte ; dans un panneau étroit, les jauges seules
     const layout = layoutFor(e.props.bodyColumns)
     const lines = rows(snap, current, await $.clock.now(), layout)

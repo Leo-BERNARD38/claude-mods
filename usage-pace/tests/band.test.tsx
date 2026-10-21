@@ -134,6 +134,8 @@ test('/rythme répond en texte', async ($, on) => {
     /Semaine : 66% — = dans le rythme \(temps écoulé 66% · reste 34% pour 2j9h ≈ 14%\/jour\)/,
   )
   expect(r.text).toMatch(/Contexte : 11% \(22k \/ 200k tokens\)/)
+  // le diagnostic d'affichage : sur quelle surface le bandeau a été dessiné
+  expect(r.text).toMatch(/Affichage \(usage-pace [0-9.]+\) : bandeau /)
 })
 
 test('temps : un npm test de 40 s dans un échange de 1 min → 20 s pour Claude, 40 s pour les outils', async ($, on) => {
