@@ -277,7 +277,7 @@ export const register: Register = (on, options) => {
     const drawn = lastDraw
       ? `dessiné pour ${lastDraw.surface} sur ${lastDraw.columns} colonnes`
       : 'pas encore dessiné'
-    const affichage = `Affichage (usage-pace 1.4.2) : bandeau ${drawn} ; surfaces de la session : ${surfaces}`
+    const affichage = `Affichage (usage-pace 1.4.3) : bandeau ${drawn} ; surfaces de la session : ${surfaces}`
     return { text: [summary(snap, await read($, stats), now), ...garde, affichage].join('\n') }
   })
 

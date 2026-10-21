@@ -66,6 +66,18 @@ function graphRows({ Box, Text }: Kit, rows: Row[], seg: Draw, bar: (row: Row, i
   )
 }
 
+/**
+ * Une barre en caractères, d'un seul tenant : coupée au bout plutôt que repliée sur deux lignes
+ * là où ses caractères sont plus larges que prévu (une police qui n'est pas celle du terminal).
+ */
+function barText(Text: Kit['Text'], bar: Seg[], seg: Draw, i: number) {
+  return (
+    <Text wrap="truncate-end" mono>
+      {bar.map((s, j) => seg(s, `bar-${i}-${j}`))}
+    </Text>
+  )
+}
+
 export function waiting({ Box, Text }: Kit) {
   return (
     <Box key="usage-pace">
@@ -91,7 +103,7 @@ export function band({ Box, Text }: Kit, rows: Row[], layout: Layout, columns: n
     const width = barCells(columns)
     return graphRows({ Box, Text }, rows, seg, (row, i) => (
       <Box width={width + 1} flexShrink={0} flexDirection="row">
-        {(row.meter ? meterBar(row.meter, width) : row.bar).map((s, j) => seg(s, `bar-${i}-${j}`))}
+        {barText(Text, row.meter ? meterBar(row.meter, width) : row.bar, seg, i)}
       </Box>
     ))
   }
@@ -106,7 +118,7 @@ export function band({ Box, Text }: Kit, rows: Row[], layout: Layout, columns: n
           {/* pas de fragment <></> ici : le moteur l'empile en colonne au lieu de l'aplatir dans la ligne */}
           {row.bar.length > 0 && (
             <Box width={COLUMNS.bar} flexDirection="row">
-              {row.bar.map((s, j) => seg(s, `bar-${i}-${j}`))}
+              {barText(Text, row.bar, seg, i)}
             </Box>
           )}
           {row.bar.length > 0 && (
