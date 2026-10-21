@@ -14,8 +14,9 @@ Temps     ███▓▓▓▓▓▓░  60%   goulot : les outils        Claud
 Dans l'app desktop, le bandeau dessine de vraies jauges (SVG) à la place des caractères : même contenu,
 même repère du temps écoulé, lisibles en thème clair et sombre.
 
-Le bandeau s'adapte à sa largeur (panneau latéral, fenêtre étroite) : sous 110 colonnes il raccourcit les détails,
-sous 80 chaque ligne passe sur deux (verdict et détails sous la barre), sous 50 il ne garde que la barre et le verdict.
+Sous 110 colonnes (panneau latéral, fenêtre étroite), le bandeau ne garde que les jauges : Session, Semaine,
+Contexte (remplie à son niveau et découpée par composition) et Temps, chacune avec son %.
+Le contexte a ses propres couleurs (bleu, rose, turquoise, orange), distinctes de celles du temps.
 
 `/rythme` donne le même résumé en texte (utile dans l'extension VS Code, où le bandeau ne s'affiche pas).
 

@@ -1,17 +1,30 @@
 // Briques d'affichage communes : unités, nombres, barres.
 
-export type Tone = 'ok' | 'warn' | 'bad' | 'dim' | 'mark' | 'claude' | 'tools' | 'you' | 'blue'
+export type Tone =
+  | 'ok'
+  | 'warn'
+  | 'bad'
+  | 'dim'
+  | 'mark'
+  | 'claude'
+  | 'tools'
+  | 'you'
+  | 'blue'
+  | 'pink'
+  | 'teal'
+  | 'orange'
 
 /** Un morceau de texte et sa couleur. */
 export type Seg = { text: string; tone: Tone }
 
 /**
  * La même barre en chiffres, pour les surfaces qui dessinent de vraies jauges (l'app desktop) :
- * une jauge remplie avec le repère du temps écoulé, ou une barre empilée.
+ * une jauge remplie avec le repère du temps écoulé, ou une barre empilée
+ * (sur toute la largeur, ou seulement sur `fill` % : le contexte rempli, découpé par composition).
  */
 export type Meter =
   | { kind: 'gauge'; pct: number; tone: Tone; marker?: number }
-  | { kind: 'stack'; parts: { name: string; value: number; tone: Tone }[] }
+  | { kind: 'stack'; parts: { name: string; value: number; tone: Tone }[]; fill?: number }
 
 /** Une ligne du bandeau : libellé, barre, pourcentage, verdict, détails. */
 export type Row = {
@@ -89,6 +102,17 @@ export function stacked(parts: { value: number; glyph: string; tone: Tone }[], w
     if (n > 0) cells.push({ text: p.glyph.repeat(n), tone: p.tone })
   })
   return merge(cells)
+}
+
+/** Jauge remplie à `fill` %, la partie remplie découpée comme une barre empilée. */
+export function filledStack(parts: { value: number; tone: Tone }[], fill: number, width = BAR_WIDTH): Seg[] {
+  const n = Math.max(1, Math.round((clamp(fill, 0, 100) / 100) * width))
+  const filled = stacked(
+    parts.map(p => ({ ...p, glyph: '━' })),
+    n,
+  )
+  if (!filled.length) return gauge(fill, 'dim', undefined, width)
+  return n < width ? [...filled, { text: '─'.repeat(width - n), tone: 'dim' }] : filled
 }
 
 function clamp(x: number, min: number, max: number): number {

@@ -281,9 +281,9 @@ export const register: Register = (on, options) => {
     const kit = $.ui.resolve(e)
 
     if (!snap || (!snap.limits.length && snap.ctx === undefined)) return waiting(kit)
-    // plus le bandeau est étroit (panneau latéral), moins il en dit
+    // en pleine largeur tout le texte ; dans un panneau étroit, les jauges seules
     const layout = layoutFor(e.props.bodyColumns)
-    const lines = rows(snap, current, await $.clock.now(), layout !== 'wide')
+    const lines = rows(snap, current, await $.clock.now(), layout)
     // dans l'app desktop : de vraies jauges ; ailleurs, les barres en caractères
     if (e.surface === 'desktop') return bandApp($.ui.resolve(e), lines, layout)
     return band(kit, lines, layout)

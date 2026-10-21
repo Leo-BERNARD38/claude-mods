@@ -12,6 +12,9 @@ export const HEX: Record<Tone, string> = {
   tools: '#a855f7',
   you: '#f59e0b',
   blue: '#3b82f6',
+  pink: '#ec4899',
+  teal: '#14b8a6',
+  orange: '#f97316',
 }
 
 /** Taille d'une jauge, en pixels CSS. */
@@ -54,6 +57,8 @@ export function meterSvg(meter: Meter, label: string): { source: string; alt: st
   }
 
   const total = meter.parts.reduce((sum, p) => sum + p.value, 0)
+  // le contexte : seule la partie remplie est découpée, le reste est la piste
+  const span = meter.fill === undefined ? w : (clamp(meter.fill) / 100) * w
   const parts = [
     open,
     clip,
@@ -62,7 +67,7 @@ export function meterSvg(meter: Meter, label: string): { source: string; alt: st
   let x = 0
   for (const p of meter.parts) {
     if (!total || p.value <= 0) continue
-    const pw = (p.value / total) * w
+    const pw = (p.value / total) * span
     // 1 px d'écart entre deux parts, pour les distinguer quand les couleurs sont proches
     parts.push(
       `<rect x="${round(x)}" y="${y}" width="${round(Math.max(0, pw - 1))}" height="${bar}" fill="${HEX[p.tone]}"/>`,
@@ -72,6 +77,7 @@ export function meterSvg(meter: Meter, label: string): { source: string; alt: st
   parts.push('</g></svg>')
   const alt =
     `${label} : ` +
+    (meter.fill === undefined ? '' : `${Math.round(meter.fill)} %, dont `) +
     meter.parts
       .filter(p => p.value > 0)
       .map(p => `${p.name} ${total ? Math.round((p.value / total) * 100) : 0} %`)

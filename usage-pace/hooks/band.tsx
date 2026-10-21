@@ -18,84 +18,41 @@ const COLORS: Record<Tone, string | undefined> = {
   tools: 'magenta',
   you: 'yellow',
   blue: 'blue',
+  pink: '#ec4899',
+  teal: '#14b8a6',
+  orange: '#f97316',
 }
 
 /** Largeur des colonnes, en caractères. */
-const COLUMNS = { label: 10, bar: 11, pct: 6, verdict: 30, verdictCompact: 26 }
+const COLUMNS = { label: 10, bar: 11, pct: 6, verdict: 30 }
 
-/**
- * Plus la place manque, moins on en dit :
- * - wide : tout sur une ligne ; compact : moins de détails ;
- * - narrow : chaque ligne sur deux, verdict et détails en dessous de la barre ;
- * - tiny : la barre, puis seulement le verdict (ou, à défaut, le détail).
- */
-export type Layout = 'wide' | 'compact' | 'narrow' | 'tiny'
+/** Toute la largeur : tout le texte ; sinon (panneau latéral, fenêtre étroite) : les jauges seules. */
+export type Layout = 'wide' | 'graphs'
 
-/** Paliers de largeur (en colonnes du bandeau) en dessous desquels on passe au mode suivant. */
-const BELOW = { wide: 110, compact: 80, narrow: 50 }
+/** En dessous de cette largeur (en colonnes du bandeau), on ne garde que les jauges. */
+const GRAPHS_BELOW = 110
 
 export function layoutFor(columns: number): Layout {
-  if (columns >= BELOW.wide) return 'wide'
-  if (columns >= BELOW.compact) return 'compact'
-  if (columns >= BELOW.narrow) return 'narrow'
-  return 'tiny'
-}
-
-/** Ce qui va sous la barre en mode étroit : verdict et détails, ou seulement l'essentiel. */
-function under(row: Row, layout: Layout): Seg[] {
-  const verdict = row.verdict ? [row.verdict] : []
-  if (layout === 'tiny') return verdict.length ? verdict : row.detail
-  if (!verdict.length) return row.detail
-  return row.detail.length ? [...verdict, { text: ' · ', tone: 'dim' }, ...row.detail] : verdict
+  return columns >= GRAPHS_BELOW ? 'wide' : 'graphs'
 }
 
 type Draw = (s: Seg, key: string) => JSX.Element
 
-/** Mode étroit : libellé + barre + % sur une ligne, le reste dessous, qui passe à la ligne au besoin. */
-function stackedRows(
-  { Box, Text }: Kit,
-  rows: Row[],
-  layout: Layout,
-  seg: Draw,
-  bar: (row: Row, i: number) => JSX.Element | null,
-) {
+/** Les jauges seules : libellé, barre, %. */
+function graphRows({ Box, Text }: Kit, rows: Row[], seg: Draw, bar: (row: Row, i: number) => JSX.Element | null) {
   return (
     <Box key="usage-pace" flexDirection="column">
-      {rows.map((row, i) => {
-        const drawn = bar(row, i)
-        const rest = under(row, layout)
-        // une ligne sans barre (Ici) garde ses détails à côté du libellé
-        if (!drawn) {
-          return (
-            <Box key={`row-${i}`} flexDirection="row">
-              <Box width={COLUMNS.label} flexShrink={0}>
-                <Text dimColor>{row.label}</Text>
-              </Box>
-              <Box flexDirection="row" flexWrap="wrap" flexShrink={1}>
-                {rest.map((s, j) => seg(s, `detail-${i}-${j}`))}
-              </Box>
-            </Box>
-          )
-        }
-        return (
-          <Box key={`row-${i}`} flexDirection="column">
-            <Box flexDirection="row" alignItems="center">
-              <Box width={COLUMNS.label} flexShrink={0}>
-                <Text dimColor>{row.label}</Text>
-              </Box>
-              {drawn}
-              <Box width={COLUMNS.pct} flexShrink={0}>
-                {row.pct ? seg(row.pct, `pct-${i}`) : <Text> </Text>}
-              </Box>
-            </Box>
-            {rest.length > 0 && (
-              <Box flexDirection="row" flexWrap="wrap" paddingLeft={COLUMNS.label}>
-                {rest.map((s, j) => seg(s, `under-${i}-${j}`))}
-              </Box>
-            )}
+      {rows.map((row, i) => (
+        <Box key={`row-${i}`} flexDirection="row" alignItems="center">
+          <Box width={COLUMNS.label} flexShrink={0}>
+            <Text dimColor>{row.label}</Text>
           </Box>
-        )
-      })}
+          {bar(row, i)}
+          <Box width={COLUMNS.pct} flexShrink={0}>
+            {row.pct ? seg(row.pct, `pct-${i}`) : <Text> </Text>}
+          </Box>
+        </Box>
+      ))}
     </Box>
   )
 }
@@ -121,16 +78,13 @@ export function band({ Box, Text }: Kit, rows: Row[], layout: Layout) {
     </Text>
   )
 
-  if (layout === 'narrow' || layout === 'tiny') {
-    return stackedRows({ Box, Text }, rows, layout, seg, (row, i) =>
-      row.bar.length > 0 ? (
-        <Box width={COLUMNS.bar} flexShrink={0} flexDirection="row">
-          {row.bar.map((s, j) => seg(s, `bar-${i}-${j}`))}
-        </Box>
-      ) : null,
-    )
+  if (layout === 'graphs') {
+    return graphRows({ Box, Text }, rows, seg, (row, i) => (
+      <Box width={COLUMNS.bar} flexShrink={0} flexDirection="row">
+        {row.bar.map((s, j) => seg(s, `bar-${i}-${j}`))}
+      </Box>
+    ))
   }
-  const compact = layout === 'compact'
 
   return (
     <Box key="usage-pace" flexDirection="column">
@@ -149,7 +103,7 @@ export function band({ Box, Text }: Kit, rows: Row[], layout: Layout) {
             <Box width={COLUMNS.pct}>{row.pct ? seg(row.pct, `pct-${i}`) : <Text> </Text>}</Box>
           )}
           {row.bar.length > 0 && (
-            <Box width={compact ? COLUMNS.verdictCompact : COLUMNS.verdict}>
+            <Box width={COLUMNS.verdict}>
               {row.verdict ? seg(row.verdict, `verdict-${i}`) : <Text> </Text>}
             </Box>
           )}
@@ -186,8 +140,8 @@ export function bandApp({ Box, Text, Svg }: AppKit, rows: Row[], layout: Layout)
     </Text>
   )
 
-  if (layout === 'narrow' || layout === 'tiny') {
-    return stackedRows({ Box, Text }, rows, layout, seg, row => {
+  if (layout === 'graphs') {
+    return graphRows({ Box, Text }, rows, seg, row => {
       const svg = row.meter && meterSvg(row.meter, row.label.trim())
       return svg ? (
         <Box paddingRight={1} flexShrink={0}>
@@ -196,7 +150,6 @@ export function bandApp({ Box, Text, Svg }: AppKit, rows: Row[], layout: Layout)
       ) : null
     })
   }
-  const compact = layout === 'compact'
 
   return (
     <Box key="usage-pace" flexDirection="column" rowGap={0}>
@@ -214,7 +167,7 @@ export function bandApp({ Box, Text, Svg }: AppKit, rows: Row[], layout: Layout)
             )}
             {svg && <Box width={COLUMNS.pct}>{row.pct ? seg(row.pct, `pct-${i}`) : <Text> </Text>}</Box>}
             {svg && (
-              <Box width={compact ? COLUMNS.verdictCompact : COLUMNS.verdict}>
+              <Box width={COLUMNS.verdict}>
                 {row.verdict ? seg(row.verdict, `verdict-${i}`) : <Text> </Text>}
               </Box>
             )}

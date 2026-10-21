@@ -1,13 +1,14 @@
 // Le contexte : remplissage, composition, et prochaine compaction automatique.
 import type { CtxPart, UsageSnapshot } from '../types'
-import { gauge, joined, plural, stacked, tokens } from './format'
+import { filledStack, gauge, joined, plural, stacked, tokens } from './format'
 import type { Row, Seg, Tone } from './format'
 
+// des couleurs à part : la ligne Temps a déjà le cyan, le violet et le jaune
 const PARTS: Record<CtxPart, { tone: Tone; glyph: string }> = {
-  conversation: { tone: 'claude', glyph: '█' },
-  MCP: { tone: 'tools', glyph: '▓' },
-  instructions: { tone: 'you', glyph: '▒' },
-  skills: { tone: 'blue', glyph: '▒' },
+  conversation: { tone: 'blue', glyph: '█' },
+  MCP: { tone: 'pink', glyph: '▓' },
+  instructions: { tone: 'teal', glyph: '▒' },
+  skills: { tone: 'orange', glyph: '▒' },
   système: { tone: 'dim', glyph: '░' },
 }
 
@@ -90,6 +91,25 @@ export function contextRows(snap: UsageSnapshot, compact: boolean): Row[] {
   }
   const parts = compositionRow(snap, compact)
   return parts ? [fill, parts] : [fill]
+}
+
+/** En version graphique : une seule jauge, remplie à hauteur du contexte et découpée par composition. */
+export function contextGraph(snap: UsageSnapshot): Row | null {
+  const [fill] = contextRows(snap, true)
+  const parts = snap.ctxParts
+  if (!fill || snap.ctx === undefined || !parts?.length) return fill ?? null
+  return {
+    ...fill,
+    bar: filledStack(
+      parts.map(p => ({ value: p.tokens, tone: PARTS[p.key].tone })),
+      snap.ctx,
+    ),
+    meter: {
+      kind: 'stack',
+      fill: snap.ctx,
+      parts: parts.map(p => ({ name: p.key, value: p.tokens, tone: PARTS[p.key].tone })),
+    },
+  }
 }
 
 /** Ligne "dont" : de quoi est fait le contexte, et quand la compaction arrivera. */
