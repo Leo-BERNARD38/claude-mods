@@ -97,7 +97,7 @@ test('le bandeau s’affiche sur terminal et desktop', async ($, on) => {
 test('panneau étroit : les jauges seules, le contexte en une jauge découpée', async ($, on) => {
   engine(on)
   await $.session.measure({ context: CONTEXT, rateLimits: RATE_LIMITS, changed: ['context', 'rateLimits'] })
-  for (const surface of ['terminal', 'desktop'] as const) {
+  for (const surface of ['terminal', 'desktop', 'vscode'] as const) {
     const ui = await $.ui.mount({ ...BAND, surface, props: { ...BAND.props, bodyColumns: 60 } })
     const rows = columns(await ui.drawn())
     // Session, Semaine, Contexte : libellé, jauge, % (pas encore de Temps : aucun échange)
@@ -106,8 +106,15 @@ test('panneau étroit : les jauges seules, le contexte en une jauge découpée',
     expect(await ui.find({ type: 'Text', text: /dans le rythme/ })).toBeUndefined()
     expect(await ui.find({ type: 'Text', text: /tokens/ })).toBeUndefined()
     expect(await ui.find({ type: 'Text', text: '11%' })).toBeDefined()
-    if (surface === 'desktop') {
-      const svgs = await ui.findAll({ type: 'Svg' })
+    // la jauge prend toute la place entre le libellé (10) et le % (6)
+    expect(rows[0]?.[1]?.props.width).toBe(44)
+    const svgs = await ui.findAll({ type: 'Svg' })
+    if (surface === 'terminal') {
+      expect(svgs.length).toBe(0)
+    } else {
+      // VS Code dessine les jauges comme l'app, sans largeur fixe : elles s'étirent
+      expect(svgs.length).toBe(3)
+      expect(svgs[0]?.props.width).toBeUndefined()
       expect(svgs[2]?.props.alt).toBe('Contexte : 11 %, dont conversation 55 %, MCP 27 %, système 18 %')
     }
     await ui.unmount()

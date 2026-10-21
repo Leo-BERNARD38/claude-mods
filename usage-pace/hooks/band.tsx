@@ -1,7 +1,8 @@
 // Dessin du bandeau : une ligne par Row, en colonnes alignées.
-// Deux rendus : le terminal (barres en caractères) et l'app desktop (jauges SVG).
+// Deux rendus : le terminal (barres en caractères) et les surfaces graphiques (jauges SVG).
 import type { Elements, RenderSurface } from 'claude-code'
 
+import { meterBar } from './format'
 import type { Row, Seg, Tone } from './format'
 import { HEX, METER, meterSvg } from './svg'
 
@@ -36,6 +37,14 @@ export function layoutFor(columns: number): Layout {
   return columns >= GRAPHS_BELOW ? 'wide' : 'graphs'
 }
 
+/** En version graphique, la jauge prend toute la place entre le libellé et le %. */
+function barCells(columns: number): number {
+  return Math.max(COLUMNS.bar, columns - COLUMNS.label - COLUMNS.pct - 1)
+}
+
+/** Largeur indicative d'une case, en pixels : la jauge s'étire ensuite sur la place réelle. */
+const CELL_PX = 9
+
 type Draw = (s: Seg, key: string) => JSX.Element
 
 /** Les jauges seules : libellé, barre, %. */
@@ -65,7 +74,7 @@ export function waiting({ Box, Text }: Kit) {
   )
 }
 
-export function band({ Box, Text }: Kit, rows: Row[], layout: Layout) {
+export function band({ Box, Text }: Kit, rows: Row[], layout: Layout, columns: number) {
   const seg = (s: Seg, key: string) => (
     <Text
       key={key}
@@ -79,9 +88,10 @@ export function band({ Box, Text }: Kit, rows: Row[], layout: Layout) {
   )
 
   if (layout === 'graphs') {
+    const width = barCells(columns)
     return graphRows({ Box, Text }, rows, seg, (row, i) => (
-      <Box width={COLUMNS.bar} flexShrink={0} flexDirection="row">
-        {row.bar.map((s, j) => seg(s, `bar-${i}-${j}`))}
+      <Box width={width + 1} flexShrink={0} flexDirection="row">
+        {(row.meter ? meterBar(row.meter, width) : row.bar).map((s, j) => seg(s, `bar-${i}-${j}`))}
       </Box>
     ))
   }
@@ -126,8 +136,8 @@ const APP_COLORS: Record<Tone, string | undefined> = {
   mark: undefined,
 }
 
-/** Le bandeau de l'app desktop : mêmes lignes, jauges SVG à la place des caractères. */
-export function bandApp({ Box, Text, Svg }: AppKit, rows: Row[], layout: Layout) {
+/** Le bandeau des surfaces graphiques (app desktop, VS Code) : mêmes lignes, jauges SVG à la place des caractères. */
+export function bandApp({ Box, Text, Svg }: AppKit, rows: Row[], layout: Layout, columns: number) {
   const seg = (s: Seg, key: string) => (
     <Text
       key={key}
@@ -141,11 +151,13 @@ export function bandApp({ Box, Text, Svg }: AppKit, rows: Row[], layout: Layout)
   )
 
   if (layout === 'graphs') {
+    const width = barCells(columns)
     return graphRows({ Box, Text }, rows, seg, row => {
-      const svg = row.meter && meterSvg(row.meter, row.label.trim())
+      const svg = row.meter && meterSvg(row.meter, row.label.trim(), width * CELL_PX, true)
+      // sans largeur, la jauge prend celle de sa boîte : toute la place entre libellé et %
       return svg ? (
-        <Box paddingRight={1} flexShrink={0}>
-          <Svg source={svg.source} alt={svg.alt} width={METER.width} height={METER.height} />
+        <Box width={width + 1} paddingRight={1} flexShrink={0}>
+          <Svg source={svg.source} alt={svg.alt} height={METER.height} />
         </Box>
       ) : null
     })

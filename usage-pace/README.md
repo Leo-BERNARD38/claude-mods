@@ -11,14 +11,15 @@ Ici       1h12 · 23 échanges · 41 outils · 2 fichiers modifiés · cache 92%
 Temps     ███▓▓▓▓▓▓░  60%   goulot : les outils        Claude 6min · outils 12min · toi 2min · plus lent : npm test 9min (×3)
 ```
 
-Dans l'app desktop, le bandeau dessine de vraies jauges (SVG) à la place des caractères : même contenu,
+Dans l'app desktop et VS Code, le bandeau dessine de vraies jauges (SVG) à la place des caractères : même contenu,
 même repère du temps écoulé, lisibles en thème clair et sombre.
 
 Sous 110 colonnes (panneau latéral, fenêtre étroite), le bandeau ne garde que les jauges : Session, Semaine,
-Contexte (remplie à son niveau et découpée par composition) et Temps, chacune avec son %.
+Contexte (remplie à son niveau et découpée par composition) et Temps, chacune avec son %,
+étirées sur toute la largeur.
 Le contexte a ses propres couleurs (bleu, rose, turquoise, orange), distinctes de celles du temps.
 
-`/rythme` donne le même résumé en texte (utile dans l'extension VS Code, où le bandeau ne s'affiche pas).
+`/rythme` donne le même résumé en texte.
 
 ## Garde-fou : Claude gère lui-même ses quotas
 

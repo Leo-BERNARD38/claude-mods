@@ -115,6 +115,16 @@ export function filledStack(parts: { value: number; tone: Tone }[], fill: number
   return n < width ? [...filled, { text: '─'.repeat(width - n), tone: 'dim' }] : filled
 }
 
+/** La barre en caractères d'une jauge, à la largeur voulue. */
+export function meterBar(meter: Meter, width: number): Seg[] {
+  if (meter.kind === 'gauge') return gauge(meter.pct, meter.tone, meter.marker, width)
+  if (meter.fill !== undefined) return filledStack(meter.parts, meter.fill, width)
+  return stacked(
+    meter.parts.map(p => ({ ...p, glyph: '█' })),
+    width,
+  )
+}
+
 function clamp(x: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, x))
 }

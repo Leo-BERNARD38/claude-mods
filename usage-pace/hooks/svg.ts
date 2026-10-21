@@ -30,12 +30,21 @@ function round(x: number): number {
   return Math.round(x * 10) / 10
 }
 
-/** Le SVG d'une jauge, et sa description pour qui ne la voit pas. */
-export function meterSvg(meter: Meter, label: string): { source: string; alt: string } {
-  const { width: w, height: h, bar } = METER
+/**
+ * Le SVG d'une jauge, et sa description pour qui ne la voit pas.
+ * `stretch` : la jauge s'étire sur la place qu'on lui donne (largeur `w` indicative).
+ */
+export function meterSvg(
+  meter: Meter,
+  label: string,
+  w: number = METER.width,
+  stretch = false,
+): { source: string; alt: string } {
+  const { height: h, bar } = METER
   const y = (h - bar) / 2
   const r = bar / 2
-  const open = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">`
+  const fit = stretch ? ' preserveAspectRatio="none"' : ''
+  const open = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"${fit}>`
   const clip = `<clipPath id="c"><rect x="0" y="${y}" width="${w}" height="${bar}" rx="${r}"/></clipPath>`
 
   if (meter.kind === 'gauge') {

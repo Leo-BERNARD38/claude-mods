@@ -284,8 +284,8 @@ export const register: Register = (on, options) => {
     // en pleine largeur tout le texte ; dans un panneau étroit, les jauges seules
     const layout = layoutFor(e.props.bodyColumns)
     const lines = rows(snap, current, await $.clock.now(), layout)
-    // dans l'app desktop : de vraies jauges ; ailleurs, les barres en caractères
-    if (e.surface === 'desktop') return bandApp($.ui.resolve(e), lines, layout)
-    return band(kit, lines, layout)
+    // là où l'on peut dessiner (app desktop, VS Code) : de vraies jauges ; au terminal, des caractères
+    if (e.surface !== 'terminal') return bandApp($.ui.resolve(e), lines, layout, e.props.bodyColumns)
+    return band(kit, lines, layout, e.props.bodyColumns)
   })
 }
