@@ -79,7 +79,10 @@ export function timeRow(stats: SessionStats | null, compact: boolean): Row | nul
       kind: 'stack',
       parts: BUCKETS.map(b => ({ name: b.short, value: stats.time[b.key], tone: b.tone })),
     },
-    pct: { text: `${Math.round((stats.time[top.key] / total) * 100)}%`, tone: top.tone },
+    // en version graphique, la durée mesurée plutôt que la part du goulot
+    pct: compact
+      ? { text: duration(total), tone: top.tone }
+      : { text: `${Math.round((stats.time[top.key] / total) * 100)}%`, tone: top.tone },
     verdict: { text: `goulot : ${top.name}`, tone: top.tone },
     detail: joined(detail),
   }

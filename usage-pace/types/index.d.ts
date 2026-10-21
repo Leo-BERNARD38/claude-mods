@@ -7,6 +7,8 @@ export type CtxPart = 'conversation' | 'système' | 'MCP' | 'instructions' | 'sk
 /** Dernière mesure des limites et du contexte. */
 export type UsageSnapshot = {
   limits: UsageLimit[]
+  /** les limites viennent du relevé d'une session précédente, fait à ce moment (ms epoch) */
+  limitsAt?: number
   ctx?: number
   ctxTokens?: number
   ctxWindow?: number

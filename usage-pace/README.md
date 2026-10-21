@@ -13,10 +13,17 @@ Temps     ███▓▓▓▓▓▓░  60%   goulot : les outils        Claud
 
 Dans l'app desktop et VS Code, le bandeau dessine de vraies jauges (SVG) à la place des caractères : même contenu,
 même repère du temps écoulé, lisibles en thème clair et sombre.
+Quand un volet se rouvre, ses jauges sont redemandées (aussitôt, puis après 1,5 s et 5 s), et de nouveau
+à chaque minute : une image que la surface n'a pas su charger ne reste pas en texte de remplacement.
 
 Sous 110 colonnes (panneau latéral, fenêtre étroite), le bandeau ne garde que les jauges : Session, Semaine,
-Contexte (remplie à son niveau et découpée par composition) et Temps, chacune avec son %,
-étirées sur toute la largeur.
+Contexte (remplie à son niveau et découpée par composition) et Temps, étirées sur toute la largeur.
+À droite de chacune : le % et le temps avant le reset (Session, Semaine), les tokens (Contexte),
+la durée mesurée (Temps).
+
+Dès l'ouverture de la session, avant la première réponse, le bandeau reprend le dernier relevé
+(`~/.usage-pace/quotas.json`) : son % est précédé de `~` (et « relevé il y a … » en pleine largeur)
+jusqu'à la première vraie mesure. Une fenêtre déjà repassée n'est pas reprise.
 Le contexte a ses propres couleurs (bleu, rose, turquoise, orange), distinctes de celles du temps.
 
 `/rythme` donne le même résumé en texte.

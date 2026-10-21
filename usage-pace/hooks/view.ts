@@ -12,7 +12,7 @@ export const NO_DATA = 'Pas encore de mesure : envoie un premier message à Clau
 export function rows(snap: UsageSnapshot, stats: SessionStats | null, now: number, layout: Layout): Row[] {
   if (layout === 'graphs') return graphs(snap, stats, now)
   return [
-    ...limitRows(snap.limits, stats, now, false),
+    ...limitRows(snap.limits, stats, now, false, snap.limitsAt),
     ...contextRows(snap, false),
     sessionRow(snap, stats, now, false),
     timeRow(stats, false),
@@ -21,9 +21,11 @@ export function rows(snap: UsageSnapshot, stats: SessionStats | null, now: numbe
 
 /** Les quatre jauges : Session, Semaine, Contexte (rempli et découpé par composition), Temps. */
 function graphs(snap: UsageSnapshot, stats: SessionStats | null, now: number): Row[] {
-  return [...limitRows(snap.limits, stats, now, true), contextGraph(snap), timeRow(stats, true)].filter(
-    (r): r is Row => r !== null && r.bar.length > 0,
-  )
+  return [
+    ...limitRows(snap.limits, stats, now, true, snap.limitsAt),
+    contextGraph(snap),
+    timeRow(stats, true),
+  ].filter((r): r is Row => r !== null && r.bar.length > 0)
 }
 
 /** Le même contenu, une ligne de texte par ligne du bandeau. */

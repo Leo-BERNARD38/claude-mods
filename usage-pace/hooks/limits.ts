@@ -92,6 +92,8 @@ export function limitRows(
   stats: SessionStats | null,
   now: number,
   compact: boolean,
+  /** les limites viennent d'un relevé d'avant cette session (ms epoch) : leur % peut avoir monté */
+  readAt?: number,
 ): Row[] {
   const paces = limits.map(l => pace(l, now)).filter((p): p is Pace => p !== null)
   const week = paces.find(p => p.kind === 'seven_day')
@@ -107,6 +109,9 @@ export function limitRows(
 
     const left = 100 - p.used
     const detail: Seg[] = []
+    if (readAt !== undefined && !compact) {
+      detail.push({ text: `relevé il y a ${duration(now - readAt)} · `, tone: 'dim' })
+    }
     if (!compact) detail.push({ text: `temps écoulé ${Math.round(p.elapsed)}% · `, tone: 'dim' })
     let rest = `reste ${Math.round(left)}% pour ${duration(p.leftMs)}`
     if (p.kind === 'seven_day' && p.leftMs > DAY) rest += ` ≈ ${decimal(left / (p.leftMs / DAY))}%/jour`
@@ -126,10 +131,13 @@ export function limitRows(
     return {
       label: p.label,
       bar: gauge(p.used, v.tone, p.elapsed),
-      meter: { kind: 'gauge', pct: p.used, tone: v.tone, marker: p.elapsed },
-      pct: { text: `${Math.round(p.used)}%`, tone: v.tone },
+      // arrondis : la jauge ne se redessine qu'à chaque point de %
+      meter: { kind: 'gauge', pct: Math.round(p.used), tone: v.tone, marker: Math.round(p.elapsed) },
+      // « ~ » : un relevé d'avant cette session, en attente de la première réponse
+      pct: { text: `${readAt !== undefined ? '~' : ''}${Math.round(p.used)}%`, tone: v.tone },
       verdict: { text: v.text, tone: v.tone },
       detail,
+      tail: { text: duration(p.leftMs), tone: 'dim' },
     }
   })
 }

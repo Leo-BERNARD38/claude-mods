@@ -4,7 +4,7 @@
 //   seuil d'arrêt (90 %) → les outils sont refusés, sauf de quoi noter l'avancement
 //   reset passé          → la tâche est relancée par un prompt automatique
 import type { UsageLimit } from '../types'
-import { duration } from './format'
+import { clockTime, duration } from './format'
 import { WINDOWS, pace, verdict } from './limits'
 
 export type GuardConfig = { warnAt: number; stopAt: number; resume: boolean }
@@ -67,13 +67,7 @@ export function guardStatus(limits: UsageLimit[], cfg: GuardConfig, now: number)
 }
 
 const pct = (n: number) => `${Math.round(n)} %`
-const clock = (ms: number) =>
-  new Date(ms).toLocaleString('fr-FR', {
-    weekday: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'Europe/Paris',
-  })
+const clock = (ms: number) => clockTime(ms, true)
 
 function resumeLine(s: GuardStatus, cfg: GuardConfig, now: number): string {
   if (!s.resumeAt) return ''
