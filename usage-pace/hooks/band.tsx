@@ -25,7 +25,7 @@ const COLORS: Record<Tone, string | undefined> = {
 }
 
 /** Largeur des colonnes, en caractères. */
-const COLUMNS = { label: 10, bar: 11, pct: 6, verdict: 30 }
+const COLUMNS = { label: 10, bar: 11, pct: 6, verdict: 30, tail: 6 }
 
 /** Toute la largeur : tout le texte ; sinon (panneau latéral, fenêtre étroite) : les jauges seules. */
 export type Layout = 'wide' | 'graphs'
@@ -37,9 +37,9 @@ export function layoutFor(columns: number): Layout {
   return columns >= GRAPHS_BELOW ? 'wide' : 'graphs'
 }
 
-/** En version graphique, la jauge prend toute la place entre le libellé et le %. */
+/** En version graphique, la jauge prend toute la place entre le libellé et le %, puis le temps restant. */
 function barCells(columns: number): number {
-  return Math.max(COLUMNS.bar, columns - COLUMNS.label - COLUMNS.pct - 1)
+  return Math.max(COLUMNS.bar, columns - COLUMNS.label - COLUMNS.pct - COLUMNS.tail - 1)
 }
 
 /** Largeur indicative d'une case, en pixels : la jauge s'étire ensuite sur la place réelle. */
@@ -47,8 +47,13 @@ const CELL_PX = 9
 
 type Draw = (s: Seg, key: string) => JSX.Element
 
-/** Les jauges seules : libellé, barre, %. */
-function graphRows({ Box, Text }: Kit, rows: Row[], seg: Draw, bar: (row: Row, i: number) => JSX.Element | null) {
+/** Les jauges seules : libellé, barre, %, et à droite le temps restant (ou les tokens). */
+function graphRows(
+  { Box, Text }: Kit,
+  rows: Row[],
+  seg: Draw,
+  bar: (row: Row, i: number) => JSX.Element | null,
+) {
   return (
     <Box key="usage-pace" flexDirection="column">
       {rows.map((row, i) => (
@@ -59,6 +64,9 @@ function graphRows({ Box, Text }: Kit, rows: Row[], seg: Draw, bar: (row: Row, i
           {bar(row, i)}
           <Box width={COLUMNS.pct} flexShrink={0}>
             {row.pct ? seg(row.pct, `pct-${i}`) : <Text> </Text>}
+          </Box>
+          <Box width={COLUMNS.tail} flexShrink={0}>
+            {row.tail ? seg(row.tail, `tail-${i}`) : <Text> </Text>}
           </Box>
         </Box>
       ))}

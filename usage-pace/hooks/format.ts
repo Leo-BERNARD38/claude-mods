@@ -34,6 +34,8 @@ export type Row = {
   pct?: Seg
   verdict?: Seg
   detail: Seg[]
+  /** en version graphique, à droite du % : le temps restant, les tokens… */
+  tail?: Seg
 }
 
 export const MINUTE = 60_000

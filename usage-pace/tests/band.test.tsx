@@ -100,14 +100,18 @@ test('panneau étroit : les jauges seules, le contexte en une jauge découpée',
   for (const surface of ['terminal', 'desktop', 'vscode'] as const) {
     const ui = await $.ui.mount({ ...BAND, surface, props: { ...BAND.props, bodyColumns: 60 } })
     const rows = columns(await ui.drawn())
-    // Session, Semaine, Contexte : libellé, jauge, % (pas encore de Temps : aucun échange)
+    // Session, Semaine, Contexte : libellé, jauge, %, temps restant (pas encore de Temps : aucun échange)
     expect(rows.length).toBe(3)
-    for (const row of rows) expect(row.length).toBe(3)
+    for (const row of rows) expect(row.length).toBe(4)
     expect(await ui.find({ type: 'Text', text: /dans le rythme/ })).toBeUndefined()
     expect(await ui.find({ type: 'Text', text: /tokens/ })).toBeUndefined()
     expect(await ui.find({ type: 'Text', text: '11%' })).toBeDefined()
-    // la jauge prend toute la place entre le libellé (10) et le % (6)
-    expect(rows[0]?.[1]?.props.width).toBe(44)
+    // à droite : le temps avant le reset, et les tokens du contexte
+    expect(await ui.find({ type: 'Text', text: '2h43' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: '2j9h' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: '22k' })).toBeDefined()
+    // la jauge prend toute la place entre le libellé (10) et le % (6) suivi du temps restant (6)
+    expect(rows[0]?.[1]?.props.width).toBe(38)
     const svgs = await ui.findAll({ type: 'Svg' })
     if (surface === 'terminal') {
       expect(svgs.length).toBe(0)
@@ -119,6 +123,37 @@ test('panneau étroit : les jauges seules, le contexte en une jauge découpée',
     }
     await ui.unmount()
   }
+})
+
+test('au démarrage, le dernier relevé s’affiche avant la première réponse', async ($, on) => {
+  mock.clock(on, { now: NOW })
+  mock.store(on)
+  on('command.register', () => ({ value: undefined }) as never)
+  on('tool.register', () => ({ value: { tool: 'mcp__usage-pace__quotas' } }) as never)
+  on('session.start', () => ({ cwd: '/projet' }))
+  on('env.get', () => ({ value: '/home/toi' }) as never)
+  on('fs.write', () => ({ value: undefined }) as never)
+  on(
+    'fs.read',
+    () =>
+      ({
+        value: JSON.stringify({
+          updatedAt: at(-12 * MIN),
+          // la fenêtre déjà repassée n'est pas reprise
+          limits: [...RATE_LIMITS, { kind: 'five_hour', percentUsed: 90, resetsAt: at(-MIN) }],
+        }),
+      }) as never,
+  )
+  on('session.usage', () => ({ value: { startedAt: NOW, rateLimits: [], context: CONTEXT } }) as never)
+  await $.session.start({ cwd: '/projet', surface: 'vscode', isInteractive: true } as never)
+
+  const narrow = await $.ui.mount({ ...BAND, surface: 'vscode', props: { ...BAND.props, bodyColumns: 60 } })
+  // « ~ » : un relevé d'avant cette session
+  expect(await narrow.find({ type: 'Text', text: '~12%' })).toBeDefined()
+  expect(await narrow.find({ type: 'Text', text: '~66%' })).toBeDefined()
+  expect(await narrow.find({ type: 'Text', text: /90/ })).toBeUndefined()
+  const wide = await $.ui.mount({ ...BAND, surface: 'terminal' })
+  expect(await wide.find({ type: 'Text', text: /relevé il y a 12min/ })).toBeDefined()
 })
 
 test('/rythme répond en texte', async ($, on) => {

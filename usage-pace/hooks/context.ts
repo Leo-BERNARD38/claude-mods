@@ -97,6 +97,7 @@ export function contextRows(snap: UsageSnapshot, compact: boolean): Row[] {
 export function contextGraph(snap: UsageSnapshot): Row | null {
   const [fill] = contextRows(snap, true)
   const parts = snap.ctxParts
+  if (fill && snap.ctxTokens !== undefined) fill.tail = { text: tokens(snap.ctxTokens), tone: 'dim' }
   if (!fill || snap.ctx === undefined || !parts?.length) return fill ?? null
   return {
     ...fill,

@@ -39,10 +39,15 @@ function editedFile(e: ToolCallInput): string | undefined {
 /** Enregistre une mesure : limites, contexte et sa composition, puis alerte si ça va couper. */
 async function measure($: EngineInterface, now: Pick<SessionUsage, 'rateLimits' | 'context' | 'cost'>) {
   const prev = await read($, usage)
-  const limits = now.rateLimits.map(l => ({ kind: l.kind, percentUsed: l.percentUsed, resetsAt: l.resetsAt }))
+  const fresh = now.rateLimits.length > 0
+  // pas encore de limites (avant la première réponse) : on garde celles qu'on a, même anciennes
+  const limits = fresh
+    ? now.rateLimits.map(l => ({ kind: l.kind, percentUsed: l.percentUsed, resetsAt: l.resetsAt }))
+    : (prev?.limits ?? [])
   const snap: UsageSnapshot = {
     ...prev,
     limits,
+    limitsAt: fresh ? undefined : prev?.limitsAt,
     ctx: now.context.percent,
     ctxTokens: now.context.tokens,
     ctxWindow: now.context.window,
@@ -59,10 +64,37 @@ async function measure($: EngineInterface, now: Pick<SessionUsage, 'rateLimits' 
     }
   }
   await update($, usage, () => snap)
-  if (now.rateLimits.length) await share($, snap)
+  if (!fresh) return
+  await share($, snap)
   await ensureStats($)
+  // le point de départ de la session ne se prend que sur une vraie mesure
   await update($, stats, s => (s ? withBase(s, limits) : s))
   await alertOnce($, limits)
+}
+
+const sharedPath = async ($: EngineInterface) => {
+  const home = (await $.env.get('USERPROFILE')) ?? (await $.env.get('HOME'))
+  return home ? `${home}/.usage-pace/quotas.json` : undefined
+}
+
+/**
+ * Au démarrage, avant la première réponse, Claude Code ne connaît pas encore les limites :
+ * on reprend le dernier relevé (celui d'une session précédente), sans les fenêtres déjà repassées.
+ */
+async function loadShared($: EngineInterface) {
+  if ((await read($, usage))?.limits.length) return
+  try {
+    const path = await sharedPath($)
+    if (!path) return
+    const body = JSON.parse(await $.fs.read(path)) as { updatedAt?: string; limits?: UsageSnapshot['limits'] }
+    const at = Date.parse(body.updatedAt ?? '')
+    const now = await $.clock.now()
+    const limits = (body.limits ?? []).filter(l => l.resetsAt && Date.parse(l.resetsAt) > now)
+    if (Number.isNaN(at) || !limits.length) return
+    await update($, usage, prev => ({ ...prev, limits, limitsAt: at }))
+  } catch {
+    // pas de relevé, ou illisible : on attendra la première réponse
+  }
 }
 
 /**
@@ -71,15 +103,15 @@ async function measure($: EngineInterface, now: Pick<SessionUsage, 'rateLimits' 
  */
 async function share($: EngineInterface, snap: UsageSnapshot) {
   try {
-    const home = (await $.env.get('USERPROFILE')) ?? (await $.env.get('HOME'))
-    if (!home) return
+    const path = await sharedPath($)
+    if (!path) return
     const g = await read($, guard)
     const body = {
       updatedAt: new Date(await $.clock.now()).toISOString(),
       limits: snap.limits,
       pausedUntil: g.paused,
     }
-    await $.fs.write(`${home}/.usage-pace/quotas.json`, JSON.stringify(body, null, 2))
+    await $.fs.write(path, JSON.stringify(body, null, 2))
   } catch {
     // best effort : le fichier partagé ne doit jamais casser le bandeau
   }
@@ -194,6 +226,7 @@ export const register: Register = (on, options) => {
     if (paused && cfg.resume) armResume($, cfg, paused, await $.clock.now())
     const now = await $.session.usage()
     await ensureStats($, now.startedAt)
+    if (!now.rateLimits.length) await loadShared($)
     await measure($, now)
     $.clock.every(REFRESH_MS, () => void update($, tick, n => n + 1))
     return result
@@ -277,7 +310,7 @@ export const register: Register = (on, options) => {
     const drawn = lastDraw
       ? `dessiné pour ${lastDraw.surface} sur ${lastDraw.columns} colonnes`
       : 'pas encore dessiné'
-    const affichage = `Affichage (usage-pace 1.4.3) : bandeau ${drawn} ; surfaces de la session : ${surfaces}`
+    const affichage = `Affichage (usage-pace 1.5.0) : bandeau ${drawn} ; surfaces de la session : ${surfaces}`
     return { text: [summary(snap, await read($, stats), now), ...garde, affichage].join('\n') }
   })
 

@@ -26,8 +26,13 @@ function clamp(x: number): number {
   return Math.min(100, Math.max(0, x))
 }
 
+/**
+ * Au pixel près : une jauge qui n'a pas bougé d'un pixel garde exactement le même SVG.
+ * L'éditeur dessine chaque SVG comme une image : une source nouvelle se recharge,
+ * et pendant ce temps c'est le texte de remplacement qui s'affiche.
+ */
 function round(x: number): number {
-  return Math.round(x * 10) / 10
+  return Math.round(x)
 }
 
 /**
