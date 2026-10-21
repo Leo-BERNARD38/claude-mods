@@ -9,6 +9,7 @@ import { groupParts, nextSeries, topMcp } from './context'
 import { REMIND_EVERY, TOOL, config, guardStatus, reminder, report, resumePrompt, stopDenial } from './guard'
 import type { GuardConfig } from './guard'
 import { alerts } from './limits'
+import { clockTime } from './format'
 import { emptyStats, withBase, withTool, withTurn } from './session'
 import { splitTurn, toolKey } from './timing'
 import { NO_DATA, rows, summary } from './view'
@@ -24,8 +25,15 @@ const REFRESH_MS = 60_000
 const ALERT_MS = 8000
 const ALERTS_KEPT = 20
 
+/** Après une reconnexion d'une surface, ses images sont relancées à ces délais (ms). */
+const RETRY_IMAGES_MS = [1500, 5000]
+
 /** Le dernier dessin du bandeau, pour le diagnostic de /rythme : sur quelle surface, à quelle largeur. */
 let lastDraw: { surface: string; columns: number } | undefined
+/** Les surfaces qui se sont (re)connectées depuis le chargement du mod, pour le même diagnostic. */
+let attaches = 0
+/** La version du mod, lue dans son manifeste au démarrage. */
+let version = '?'
 
 /** Un sous-agent, c'est Claude qui réfléchit : son temps reste du côté de Claude. */
 const AGENT_TOOLS = new Set(['Agent', 'Task'])
@@ -101,6 +109,15 @@ async function loadShared($: EngineInterface) {
  * Dépose les limites dans ~/.usage-pace/quotas.json, pour les Claude qui ne chargent pas le mod
  * (une session du mode projet reliée à ce PC, un script). `updatedAt` dit si c'est frais.
  */
+async function readVersion($: EngineInterface): Promise<string> {
+  try {
+    const manifest = JSON.parse(await $.fs.read(`${$.plugin.root}/.claude-plugin/plugin.json`))
+    return typeof manifest.version === 'string' ? manifest.version : '?'
+  } catch {
+    return '?'
+  }
+}
+
 async function share($: EngineInterface, snap: UsageSnapshot) {
   try {
     const path = await sharedPath($)
@@ -156,12 +173,7 @@ function clearPause($: EngineInterface) {
 /** Arme la relance pour `at` ; à l'échéance, vérifie que la fenêtre est vraiment repartie. */
 function armResume($: EngineInterface, cfg: GuardConfig, at: number, now: number) {
   resumeTimer?.cancel()
-  const when = new Date(at).toLocaleTimeString('fr-FR', {
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'Europe/Paris',
-  })
-  $.ui.status(`⏸ quotas : reprise auto vers ${when}`)
+  $.ui.status(`⏸ quotas : reprise auto vers ${clockTime(at)}`)
   resumeTimer = $.clock.after(Math.max(1000, at - now), () => void resume($, cfg))
 }
 
@@ -206,6 +218,7 @@ export const register: Register = (on, options) => {
 
   on('session.start', async ($, e, next) => {
     const result = await next(e)
+    version = await readVersion($)
     await $.command.register({
       name: 'rythme',
       description: 'Résumé de tes limites Claude, du contexte et de la session en cours',
@@ -229,6 +242,16 @@ export const register: Register = (on, options) => {
     if (!now.rateLimits.length) await loadShared($)
     await measure($, now)
     $.clock.every(REFRESH_MS, () => void update($, tick, n => n + 1))
+    return result
+  })
+
+  // un volet qui se rouvre : ses images peuvent rester en texte de remplacement, on les relance
+  on('session.attach', async ($, e, next) => {
+    const result = await next(e)
+    attaches += 1
+    const redraw = () => void update($, tick, n => n + 1)
+    redraw()
+    for (const ms of RETRY_IMAGES_MS) $.clock.after(ms, redraw)
     return result
   })
 
@@ -310,7 +333,9 @@ export const register: Register = (on, options) => {
     const drawn = lastDraw
       ? `dessiné pour ${lastDraw.surface} sur ${lastDraw.columns} colonnes`
       : 'pas encore dessiné'
-    const affichage = `Affichage (usage-pace 1.5.0) : bandeau ${drawn} ; surfaces de la session : ${surfaces}`
+    const affichage =
+      `Affichage (usage-pace ${version}) : bandeau ${drawn} ; surfaces de la session : ${surfaces} ; ` +
+      `reconnexions : ${attaches}`
     return { text: [summary(snap, await read($, stats), now), ...garde, affichage].join('\n') }
   })
 
@@ -318,7 +343,8 @@ export const register: Register = (on, options) => {
     if (e.props.hasSurvey) return next(e)
     const snap = await read($, usage)
     const current = await read($, stats)
-    await read($, tick) // s'abonner au redessin périodique
+    // s'abonner au redessin périodique ; il sert aussi de version aux SVG, pour relancer leurs images
+    const n = await read($, tick)
     const kit = $.ui.resolve(e)
 
     if (!snap || (!snap.limits.length && snap.ctx === undefined)) return waiting(kit)
@@ -327,7 +353,8 @@ export const register: Register = (on, options) => {
     const layout = layoutFor(e.props.bodyColumns)
     const lines = rows(snap, current, await $.clock.now(), layout)
     // là où l'on peut dessiner (app desktop, VS Code) : de vraies jauges ; au terminal, des caractères
-    if (e.surface !== 'terminal') return bandApp($.ui.resolve(e), lines, layout, e.props.bodyColumns)
+    // résolue après le test : la surface restreinte, sa table a `Svg`
+    if (e.surface !== 'terminal') return bandApp($.ui.resolve(e), lines, layout, e.props.bodyColumns, n)
     return band(kit, lines, layout, e.props.bodyColumns)
   })
 }

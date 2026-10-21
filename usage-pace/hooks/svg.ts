@@ -26,30 +26,33 @@ function clamp(x: number): number {
   return Math.min(100, Math.max(0, x))
 }
 
-/**
- * Au pixel près : une jauge qui n'a pas bougé d'un pixel garde exactement le même SVG.
- * L'éditeur dessine chaque SVG comme une image : une source nouvelle se recharge,
- * et pendant ce temps c'est le texte de remplacement qui s'affiche.
- */
+/** Au pixel près : une jauge qui n'a pas bougé d'un pixel garde le même SVG. */
 function round(x: number): number {
   return Math.round(x)
 }
 
-/**
- * Le SVG d'une jauge, et sa description pour qui ne la voit pas.
- * `stretch` : la jauge s'étire sur la place qu'on lui donne (largeur `w` indicative).
- */
+export type SvgOptions = {
+  /** largeur en pixels (indicative quand la jauge s'étire) */
+  width?: number
+  /** la jauge s'étire sur la place qu'on lui donne */
+  stretch?: boolean
+  /** change la source sans changer le dessin, pour relancer une image que la surface n'a pas chargée */
+  version?: number
+}
+
+/** Le SVG d'une jauge, et sa description pour qui ne la voit pas. */
 export function meterSvg(
   meter: Meter,
   label: string,
-  w: number = METER.width,
-  stretch = false,
+  { width: w = METER.width, stretch = false, version = 0 }: SvgOptions = {},
 ): { source: string; alt: string } {
   const { height: h, bar } = METER
   const y = (h - bar) / 2
   const r = bar / 2
   const fit = stretch ? ' preserveAspectRatio="none"' : ''
-  const open = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"${fit}>`
+  const open =
+    `<svg xmlns="http://www.w3.org/2000/svg" id="v${version}" width="${w}" height="${h}" ` +
+    `viewBox="0 0 ${w} ${h}"${fit}>`
   const clip = `<clipPath id="c"><rect x="0" y="${y}" width="${w}" height="${bar}" rx="${r}"/></clipPath>`
 
   if (meter.kind === 'gauge') {

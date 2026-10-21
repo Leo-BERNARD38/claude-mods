@@ -36,6 +36,7 @@ function engine(on: On, session = { startedAt: NOW }) {
   const clock = mock.clock(on, { now: NOW })
   mock.store(on)
   on('session.measure', (_$, e) => ({ changed: e.changed }))
+  on('session.attach', (_$, e) => ({ clientId: e.clientId }))
   on('command.register', () => ({ value: undefined }) as never)
   on('tool.register', () => ({ value: { tool: 'mcp__usage-pace__quotas' } }) as never)
   on('session.start', () => ({ cwd: '/projet' }))
@@ -156,6 +157,25 @@ test('au démarrage, le dernier relevé s’affiche avant la première réponse'
   expect(await wide.find({ type: 'Text', text: /relevé il y a 12min/ })).toBeDefined()
 })
 
+test('un volet qui se rouvre : les images des jauges sont relancées, leur dessin ne change pas', async ($, on) => {
+  const clock = engine(on)
+  await $.session.measure({ context: CONTEXT, rateLimits: RATE_LIMITS, changed: ['context', 'rateLimits'] })
+  const ui = await $.ui.mount({ ...BAND, surface: 'vscode' })
+  const svg = async () => (await ui.findAll({ type: 'Svg' }))[0]?.props as { source: string; alt: string }
+  const before = await svg()
+
+  await $.session.attach({ surface: 'vscode', clientId: 'vscode:default' })
+  const now = await svg()
+  expect(now.source).not.toBe(before.source)
+  expect(now.source.replace(/id="v\d+"/, '')).toBe(before.source.replace(/id="v\d+"/, ''))
+  expect(now.alt).toBe(before.alt)
+
+  // puis une nouvelle tentative peu après
+  await clock.advance(1500)
+  expect((await svg()).source).not.toBe(now.source)
+  await ui.unmount()
+})
+
 test('/rythme répond en texte', async ($, on) => {
   engine(on)
   const r = await $.command.run({
@@ -170,7 +190,7 @@ test('/rythme répond en texte', async ($, on) => {
   )
   expect(r.text).toMatch(/Contexte : 11% \(22k \/ 200k tokens\)/)
   // le diagnostic d'affichage : sur quelle surface le bandeau a été dessiné
-  expect(r.text).toMatch(/Affichage \(usage-pace [0-9.]+\) : bandeau /)
+  expect(r.text).toMatch(/Affichage \(usage-pace [0-9.?]+\) : bandeau .* ; reconnexions : 0/)
 })
 
 test('temps : un npm test de 40 s dans un échange de 1 min → 20 s pour Claude, 40 s pour les outils', async ($, on) => {

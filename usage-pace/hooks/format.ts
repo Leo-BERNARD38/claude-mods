@@ -38,6 +38,19 @@ export type Row = {
   tail?: Seg
 }
 
+/** Les heures s'affichent à l'heure de Paris. */
+const TIME_ZONE = 'Europe/Paris'
+
+/** « 16:40 », ou avec le jour « mar. 16:40 ». */
+export function clockTime(ms: number, withDay = false): string {
+  return new Date(ms).toLocaleString('fr-FR', {
+    ...(withDay ? { weekday: 'short' } : {}),
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: TIME_ZONE,
+  })
+}
+
 export const MINUTE = 60_000
 export const HOUR = 60 * MINUTE
 export const DAY = 24 * HOUR

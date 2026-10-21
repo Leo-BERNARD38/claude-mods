@@ -131,7 +131,7 @@ export function limitRows(
     return {
       label: p.label,
       bar: gauge(p.used, v.tone, p.elapsed),
-      // arrondis : la jauge ne change qu'avec un point de % (voir svg.ts)
+      // arrondis : la jauge ne se redessine qu'à chaque point de %
       meter: { kind: 'gauge', pct: Math.round(p.used), tone: v.tone, marker: Math.round(p.elapsed) },
       // « ~ » : un relevé d'avant cette session, en attente de la première réponse
       pct: { text: `${readAt !== undefined ? '~' : ''}${Math.round(p.used)}%`, tone: v.tone },
