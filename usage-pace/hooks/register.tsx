@@ -24,12 +24,12 @@ const guard = atom({ plugin: 'usage-pace', key: 'guard' } as const, { calls: 0, 
  * Redessin périodique, pour que les comptes à rebours avancent même sans activité.
  * Court, parce qu'il relance aussi les SVG : un volet rouvert sans reconnexion ne reste pas longtemps sans jauges.
  */
-const REFRESH_MS = 15_000
+const REFRESH_MS = 5000
 const ALERT_MS = 8000
 const ALERTS_KEPT = 20
 
 /** Après une reconnexion d'une surface, ses images sont relancées à ces délais (ms). */
-const RETRY_IMAGES_MS = [1500, 5000]
+const RETRY_IMAGES_MS = [1500]
 
 /** Le dernier dessin du bandeau, pour le diagnostic de /rythme : sur quelle surface, à quelle largeur. */
 let lastDraw: { surface: string; columns: number } | undefined
@@ -357,9 +357,7 @@ export const register: Register = (on, options) => {
     const lines = rows(snap, current, await $.clock.now(), layout)
     // là où l'on peut dessiner (app desktop, VS Code) : de vraies jauges ; au terminal, des caractères
     // résolue après le test : la surface restreinte, sa table a `Svg`
-    // dans VS Code, les jauges en cadre plutôt qu'en image : un essai contre les images perdues au volet rouvert
-    if (e.surface !== 'terminal')
-      return bandApp($.ui.resolve(e), lines, layout, e.props.bodyColumns, n, e.surface === 'vscode')
+    if (e.surface !== 'terminal') return bandApp($.ui.resolve(e), lines, layout, e.props.bodyColumns, n)
     return band(kit, lines, layout, e.props.bodyColumns)
   })
 }
