@@ -1,5 +1,6 @@
 // Jauges en SVG pour l'app desktop : la même donnée que les barres en caractères du terminal.
 // Les couleurs sont choisies pour rester lisibles en thème clair comme en thème sombre.
+import { meterBar } from './format'
 import type { Meter, Tone } from './format'
 
 export const HEX: Record<Tone, string> = {
@@ -19,6 +20,8 @@ export const HEX: Record<Tone, string> = {
 
 /** Taille d'une jauge, en pixels CSS. */
 export const METER = { width: 112, height: 14, bar: 6 }
+/** La barre de remplacement d'une jauge à sa taille fixe, en caractères. */
+const ALT_CELLS = 10
 
 const TRACK = `fill="${HEX.dim}" fill-opacity="0.25"`
 
@@ -38,14 +41,22 @@ export type SvgOptions = {
   stretch?: boolean
   /** change la source sans changer le dessin, pour relancer une image que la surface n'a pas chargée */
   version?: number
+  /** longueur, en caractères, de la barre de remplacement */
+  altCells?: number
 }
 
-/** Le SVG d'une jauge, et sa description pour qui ne la voit pas. */
+/**
+ * Le SVG d'une jauge, et son texte de remplacement : la même jauge en caractères (━━━│───).
+ * Une surface qui n'a pas su charger l'image l'affiche à la place : il tient sur une ligne,
+ * là où une description en phrase repliait le bandeau sur plusieurs, le temps que l'image revienne.
+ */
 export function meterSvg(
   meter: Meter,
-  label: string,
-  { width: w = METER.width, stretch = false, version = 0 }: SvgOptions = {},
+  { width: w = METER.width, stretch = false, version = 0, altCells = ALT_CELLS }: SvgOptions = {},
 ): { source: string; alt: string } {
+  const alt = meterBar(meter, altCells)
+    .map(s => s.text)
+    .join('')
   const { height: h, bar } = METER
   const y = (h - bar) / 2
   const r = bar / 2
@@ -63,12 +74,10 @@ export function meterSvg(
       `<g clip-path="url(#c)"><rect x="0" y="${y}" width="${w}" height="${bar}" ${TRACK}/>`,
       `<rect x="0" y="${y}" width="${fill}" height="${bar}" fill="${HEX[meter.tone]}"/></g>`,
     ]
-    let alt = `${label} : ${Math.round(meter.pct)} %`
     if (meter.marker !== undefined) {
       // le repère du temps écoulé dépasse de la barre, pour se lire même sur la partie remplie
       const x = round(Math.min(w - 2, Math.max(0, (clamp(meter.marker) / 100) * w - 1)))
       parts.push(`<rect x="${x}" y="0" width="2" height="${h}" rx="1" fill="${HEX.mark}"/>`)
-      alt += `, temps écoulé ${Math.round(meter.marker)} %`
     }
     return { source: parts.join('') + '</svg>', alt }
   }
@@ -92,12 +101,5 @@ export function meterSvg(
     x += pw
   }
   parts.push('</g></svg>')
-  const alt =
-    `${label} : ` +
-    (meter.fill === undefined ? '' : `${Math.round(meter.fill)} %, dont `) +
-    meter.parts
-      .filter(p => p.value > 0)
-      .map(p => `${p.name} ${total ? Math.round((p.value / total) * 100) : 0} %`)
-      .join(', ')
   return { source: parts.join(''), alt }
 }

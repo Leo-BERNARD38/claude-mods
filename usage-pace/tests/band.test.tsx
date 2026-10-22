@@ -84,9 +84,10 @@ test('le bandeau s’affiche sur terminal et desktop', async ($, on) => {
     if (surface === 'desktop') {
       // Session, Semaine, Contexte, composition : une jauge chacune
       expect(svgs.length).toBe(4)
-      expect(svgs[0]?.props.alt).toBe('Session : 12 %, temps écoulé 46 %')
+      // si l'image ne charge pas : la même jauge en caractères, sur une ligne
+      expect(svgs[0]?.props.alt).toBe('━───│─────')
       expect(String(svgs[0]?.props.source)).toMatch(/^<svg [^>]*width="112"/)
-      expect(svgs[3]?.props.alt).toBe('dont : conversation 55 %, MCP 27 %, système 18 %')
+      expect(svgs[3]?.props.alt).toMatch(/^[█▓░▒]{10}$/)
       expect(await ui.find({ type: 'Text', text: '━' })).toBeUndefined()
     } else {
       expect(svgs.length).toBe(0)
@@ -120,7 +121,9 @@ test('panneau étroit : les jauges seules, le contexte en une jauge découpée',
       // VS Code dessine les jauges comme l'app, sans largeur fixe : elles s'étirent
       expect(svgs.length).toBe(3)
       expect(svgs[0]?.props.width).toBeUndefined()
-      expect(svgs[2]?.props.alt).toBe('Contexte : 11 %, dont conversation 55 %, MCP 27 %, système 18 %')
+      // la barre de remplacement prend les trois quarts des 37 cases de la jauge
+      expect(svgs[2]?.props.alt).toMatch(/^━+─+$/)
+      expect(String(svgs[2]?.props.alt).length).toBe(27)
     }
     await ui.unmount()
   }
