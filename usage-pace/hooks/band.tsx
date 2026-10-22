@@ -54,6 +54,11 @@ function barCells(columns: number): number {
 
 /** Largeur indicative d'une case, en pixels : la jauge s'étire ensuite sur la place réelle. */
 const CELL_PX = 9
+/**
+ * La barre de remplacement d'une jauge étirée prend cette part de ses cases : hors du terminal,
+ * ses caractères sont souvent plus larges qu'une case, et elle doit tenir sur une ligne.
+ */
+const ALT_FILL = 0.75
 
 type Draw = (s: Seg, key: string) => JSX.Element
 /** La barre d'une ligne : à sa largeur fixe en pleine largeur, sur `cells` cases en version graphique. */
@@ -154,9 +159,8 @@ export function band(kit: Kit, rows: Row[], layout: Layout, columns: number) {
 export function bandApp(kit: AppKit, rows: Row[], layout: Layout, columns: number, version = 0) {
   const { Box, Svg } = kit
   return layoutRows(kit, rows, layout, columns, segment(kit.Text, APP_COLORS), (row, _i, cells) => {
-    const label = row.label.trim()
     if (cells === undefined) {
-      const svg = row.meter && meterSvg(row.meter, label, { version })
+      const svg = row.meter && meterSvg(row.meter, { version })
       return (
         <Box paddingRight={1} flexShrink={0}>
           {svg && <Svg source={svg.source} alt={svg.alt} width={METER.width} height={METER.height} />}
@@ -164,7 +168,14 @@ export function bandApp(kit: AppKit, rows: Row[], layout: Layout, columns: numbe
       )
     }
     // sans largeur, la jauge prend celle de sa boîte : toute la place entre libellé et %
-    const svg = row.meter && meterSvg(row.meter, label, { width: cells * CELL_PX, stretch: true, version })
+    const svg =
+      row.meter &&
+      meterSvg(row.meter, {
+        width: cells * CELL_PX,
+        stretch: true,
+        version,
+        altCells: Math.max(1, Math.floor(cells * ALT_FILL)),
+      })
     return (
       <Box width={cells + 1} paddingRight={1} flexShrink={0}>
         {svg && <Svg source={svg.source} alt={svg.alt} height={METER.height} />}
