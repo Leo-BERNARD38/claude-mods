@@ -357,7 +357,9 @@ export const register: Register = (on, options) => {
     const lines = rows(snap, current, await $.clock.now(), layout)
     // là où l'on peut dessiner (app desktop, VS Code) : de vraies jauges ; au terminal, des caractères
     // résolue après le test : la surface restreinte, sa table a `Svg`
-    if (e.surface !== 'terminal') return bandApp($.ui.resolve(e), lines, layout, e.props.bodyColumns, n)
+    // dans VS Code, les jauges en cadre plutôt qu'en image : un essai contre les images perdues au volet rouvert
+    if (e.surface !== 'terminal')
+      return bandApp($.ui.resolve(e), lines, layout, e.props.bodyColumns, n, e.surface === 'vscode')
     return band(kit, lines, layout, e.props.bodyColumns)
   })
 }
