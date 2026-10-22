@@ -87,7 +87,8 @@ test('le bandeau s’affiche sur terminal et desktop', async ($, on) => {
       // si l'image ne charge pas : la même jauge en caractères, sur une ligne
       expect(svgs[0]?.props.alt).toBe('━───│─────')
       expect(String(svgs[0]?.props.source)).toMatch(/^<svg [^>]*width="112"/)
-      expect(svgs[3]?.props.alt).toMatch(/^[█▓░▒]{10}$/)
+      // une barre empilée : pleine, ses parts séparées par │
+      expect(svgs[3]?.props.alt).toMatch(/^━+(│━+)+$/)
       expect(await ui.find({ type: 'Text', text: '━' })).toBeUndefined()
     } else {
       expect(svgs.length).toBe(0)
