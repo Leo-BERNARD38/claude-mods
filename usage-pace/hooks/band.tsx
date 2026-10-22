@@ -155,25 +155,15 @@ export function band(kit: Kit, rows: Row[], layout: Layout, columns: number) {
  * Le bandeau des surfaces graphiques (app desktop, VS Code) : mêmes lignes, jauges SVG.
  * `version` change la source des SVG sans changer leur dessin : de quoi relancer des images
  * que la surface n'a pas su charger (elle affiche alors leur texte de remplacement).
- * `framed` les dessine dans un cadre plutôt qu'en image : un essai pour VS Code, qui perd ses images
- * quand le volet se rouvre.
  */
-export function bandApp(kit: AppKit, rows: Row[], layout: Layout, columns: number, version = 0, framed = false) {
+export function bandApp(kit: AppKit, rows: Row[], layout: Layout, columns: number, version = 0) {
   const { Box, Svg } = kit
   return layoutRows(kit, rows, layout, columns, segment(kit.Text, APP_COLORS), (row, _i, cells) => {
     if (cells === undefined) {
       const svg = row.meter && meterSvg(row.meter, { version })
       return (
         <Box paddingRight={1} flexShrink={0}>
-          {svg && (
-            <Svg
-              source={svg.source}
-              alt={svg.alt}
-              width={METER.width}
-              height={METER.height}
-              isInteractive={framed || undefined}
-            />
-          )}
+          {svg && <Svg source={svg.source} alt={svg.alt} width={METER.width} height={METER.height} />}
         </Box>
       )
     }
@@ -188,7 +178,7 @@ export function bandApp(kit: AppKit, rows: Row[], layout: Layout, columns: numbe
       })
     return (
       <Box width={cells + 1} paddingRight={1} flexShrink={0}>
-        {svg && <Svg source={svg.source} alt={svg.alt} height={METER.height} isInteractive={framed || undefined} />}
+        {svg && <Svg source={svg.source} alt={svg.alt} height={METER.height} />}
       </Box>
     )
   })

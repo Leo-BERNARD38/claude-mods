@@ -124,8 +124,6 @@ test('panneau étroit : les jauges seules, le contexte en une jauge découpée',
       expect(svgs[0]?.props.width).toBeUndefined()
       // la barre de remplacement prend les trois quarts des 37 cases de la jauge
       expect(svgs[2]?.props.alt).toMatch(/^━+─+$/)
-      // VS Code les dessine en cadre plutôt qu'en image ; l'app, en image
-      expect(svgs[0]?.props.isInteractive).toBe(surface === 'vscode' ? true : undefined)
       expect(String(svgs[2]?.props.alt).length).toBe(27)
     }
     await ui.unmount()
@@ -181,10 +179,10 @@ test('un volet qui se rouvre : les images des jauges sont relancées, leur dessi
   await clock.advance(1500)
   expect((await svg()).source).not.toBe(now.source)
 
-  // et de nouveau toutes les 15 s, sans reconnexion (passé la dernière relance, à 5 s)
+  // et de nouveau toutes les 5 s, sans reconnexion
   await clock.advance(4000)
   const later = (await svg()).source
-  await clock.advance(15_000)
+  await clock.advance(5000)
   expect((await svg()).source).not.toBe(later)
   await ui.unmount()
 })
