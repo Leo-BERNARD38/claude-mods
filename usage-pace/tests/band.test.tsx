@@ -87,7 +87,8 @@ test('le bandeau s’affiche sur terminal et desktop', async ($, on) => {
       // si l'image ne charge pas : la même jauge en caractères, sur une ligne
       expect(svgs[0]?.props.alt).toBe('━───│─────')
       expect(String(svgs[0]?.props.source)).toMatch(/^<svg [^>]*width="112"/)
-      expect(svgs[3]?.props.alt).toMatch(/^[█▓░▒]{10}$/)
+      // une barre empilée : pleine, ses parts séparées par │
+      expect(svgs[3]?.props.alt).toMatch(/^━+(│━+)+$/)
       expect(await ui.find({ type: 'Text', text: '━' })).toBeUndefined()
     } else {
       expect(svgs.length).toBe(0)
@@ -123,6 +124,8 @@ test('panneau étroit : les jauges seules, le contexte en une jauge découpée',
       expect(svgs[0]?.props.width).toBeUndefined()
       // la barre de remplacement prend les trois quarts des 37 cases de la jauge
       expect(svgs[2]?.props.alt).toMatch(/^━+─+$/)
+      // VS Code les dessine en cadre plutôt qu'en image ; l'app, en image
+      expect(svgs[0]?.props.isInteractive).toBe(surface === 'vscode' ? true : undefined)
       expect(String(svgs[2]?.props.alt).length).toBe(27)
     }
     await ui.unmount()
@@ -162,6 +165,7 @@ test('au démarrage, le dernier relevé s’affiche avant la première réponse'
 
 test('un volet qui se rouvre : les images des jauges sont relancées, leur dessin ne change pas', async ($, on) => {
   const clock = engine(on)
+  await $.session.start({ cwd: '/projet', surface: 'vscode', isInteractive: true } as never)
   await $.session.measure({ context: CONTEXT, rateLimits: RATE_LIMITS, changed: ['context', 'rateLimits'] })
   const ui = await $.ui.mount({ ...BAND, surface: 'vscode' })
   const svg = async () => (await ui.findAll({ type: 'Svg' }))[0]?.props as { source: string; alt: string }
@@ -176,6 +180,12 @@ test('un volet qui se rouvre : les images des jauges sont relancées, leur dessi
   // puis une nouvelle tentative peu après
   await clock.advance(1500)
   expect((await svg()).source).not.toBe(now.source)
+
+  // et de nouveau toutes les 15 s, sans reconnexion (passé la dernière relance, à 5 s)
+  await clock.advance(4000)
+  const later = (await svg()).source
+  await clock.advance(15_000)
+  expect((await svg()).source).not.toBe(later)
   await ui.unmount()
 })
 

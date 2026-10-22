@@ -46,6 +46,17 @@ export type SvgOptions = {
 }
 
 /**
+ * La jauge en caractères du texte de remplacement, en traits comme les autres (━━━│───).
+ * Une barre empilée sans remplissage (Temps) est pleine : faute de couleurs, un │ s'insère entre ses parts.
+ */
+function altBar(meter: Meter, cells: number): string {
+  if (meter.kind === 'gauge' || meter.fill !== undefined) return meterBar(meter, cells).map(s => s.text).join('')
+  return meterBar({ ...meter, fill: 100 }, cells)
+    .map(s => s.text)
+    .join('│')
+}
+
+/**
  * Le SVG d'une jauge, et son texte de remplacement : la même jauge en caractères (━━━│───).
  * Une surface qui n'a pas su charger l'image l'affiche à la place : il tient sur une ligne,
  * là où une description en phrase repliait le bandeau sur plusieurs, le temps que l'image revienne.
@@ -54,9 +65,7 @@ export function meterSvg(
   meter: Meter,
   { width: w = METER.width, stretch = false, version = 0, altCells = ALT_CELLS }: SvgOptions = {},
 ): { source: string; alt: string } {
-  const alt = meterBar(meter, altCells)
-    .map(s => s.text)
-    .join('')
+  const alt = altBar(meter, altCells)
   const { height: h, bar } = METER
   const y = (h - bar) / 2
   const r = bar / 2

@@ -20,8 +20,11 @@ const pending = atom({ plugin: 'usage-pace', key: 'pending' } as const, { spans:
 const tick = atom({ plugin: 'usage-pace', key: 'tick' } as const, 0)
 const guard = atom({ plugin: 'usage-pace', key: 'guard' } as const, { calls: 0, intervened: false })
 
-/** Redessin périodique, pour que les comptes à rebours avancent même sans activité. */
-const REFRESH_MS = 60_000
+/**
+ * Redessin périodique, pour que les comptes à rebours avancent même sans activité.
+ * Court, parce qu'il relance aussi les SVG : un volet rouvert sans reconnexion ne reste pas longtemps sans jauges.
+ */
+const REFRESH_MS = 15_000
 const ALERT_MS = 8000
 const ALERTS_KEPT = 20
 
@@ -354,7 +357,9 @@ export const register: Register = (on, options) => {
     const lines = rows(snap, current, await $.clock.now(), layout)
     // là où l'on peut dessiner (app desktop, VS Code) : de vraies jauges ; au terminal, des caractères
     // résolue après le test : la surface restreinte, sa table a `Svg`
-    if (e.surface !== 'terminal') return bandApp($.ui.resolve(e), lines, layout, e.props.bodyColumns, n)
+    // dans VS Code, les jauges en cadre plutôt qu'en image : un essai contre les images perdues au volet rouvert
+    if (e.surface !== 'terminal')
+      return bandApp($.ui.resolve(e), lines, layout, e.props.bodyColumns, n, e.surface === 'vscode')
     return band(kit, lines, layout, e.props.bodyColumns)
   })
 }
