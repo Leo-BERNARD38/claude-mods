@@ -14,7 +14,7 @@ Temps     ███▓▓▓▓▓▓░  60%   goulot : les outils        Claud
 Dans l'app desktop et VS Code, le bandeau dessine de vraies jauges (SVG) à la place des caractères : même contenu,
 même repère du temps écoulé, lisibles en thème clair et sombre.
 Quand un volet se rouvre, ses jauges sont redemandées (aussitôt, puis après 1,5 s et 5 s), et de nouveau
-à chaque minute : une image que la surface n'a pas su charger ne reste pas en texte de remplacement.
+toutes les 15 s : une image que la surface n'a pas su charger ne reste pas en texte de remplacement.
 En attendant, ce texte de remplacement est la jauge en caractères (`━━━│───`), sur une ligne.
 
 Sous 110 colonnes (panneau latéral, fenêtre étroite), le bandeau ne garde que les jauges : Session, Semaine,

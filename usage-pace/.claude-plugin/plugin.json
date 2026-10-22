@@ -1,6 +1,6 @@
 {
   "name": "usage-pace",
-  "version": "1.5.1",
+  "version": "1.5.2",
   "description": "Bandeau des limites Session / Semaine, contexte et session, plus un garde-fou : Claude lit ses quotas, se met en pause au seuil et reprend au reset",
   "author": { "name": "Léo" },
   "types": "./types/index.d.ts",

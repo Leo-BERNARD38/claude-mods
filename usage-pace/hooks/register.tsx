@@ -20,8 +20,11 @@ const pending = atom({ plugin: 'usage-pace', key: 'pending' } as const, { spans:
 const tick = atom({ plugin: 'usage-pace', key: 'tick' } as const, 0)
 const guard = atom({ plugin: 'usage-pace', key: 'guard' } as const, { calls: 0, intervened: false })
 
-/** Redessin périodique, pour que les comptes à rebours avancent même sans activité. */
-const REFRESH_MS = 60_000
+/**
+ * Redessin périodique, pour que les comptes à rebours avancent même sans activité.
+ * Court, parce qu'il relance aussi les SVG : un volet rouvert sans reconnexion ne reste pas longtemps sans jauges.
+ */
+const REFRESH_MS = 15_000
 const ALERT_MS = 8000
 const ALERTS_KEPT = 20
 
