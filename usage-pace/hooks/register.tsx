@@ -6,10 +6,7 @@ import type { EngineInterface, Register, SessionUsage, Timer, ToolCallInput } fr
 import type { SessionStats, UsageSnapshot } from '../types'
 import { band, bandApp, layoutFor, waiting } from './band'
 import { groupParts, nextSeries, topMcp } from './context'
-import { REMIND_EVERY, TOOL, config, guardStatus, reminder, report, resumePrompt, stopDenial } from './guard'
-import type { GuardConfig } from './guard'
 import { alerts } from './limits'
-import { clockTime } from './format'
 import { emptyStats, withBase, withTool, withTurn } from './session'
 import { splitTurn, toolKey } from './timing'
 import { NO_DATA, rows, summary } from './view'
@@ -18,7 +15,6 @@ const usage = atom({ plugin: 'usage-pace', key: 'usage' } as const, null)
 const stats = atom({ plugin: 'usage-pace', key: 'stats' } as const, null)
 const pending = atom({ plugin: 'usage-pace', key: 'pending' } as const, { spans: [], asked: [] })
 const tick = atom({ plugin: 'usage-pace', key: 'tick' } as const, 0)
-const guard = atom({ plugin: 'usage-pace', key: 'guard' } as const, { calls: 0, intervened: false })
 
 /**
  * Redessin périodique, pour que les comptes à rebours avancent même sans activité.
@@ -125,12 +121,7 @@ async function share($: EngineInterface, snap: UsageSnapshot) {
   try {
     const path = await sharedPath($)
     if (!path) return
-    const g = await read($, guard)
-    const body = {
-      updatedAt: new Date(await $.clock.now()).toISOString(),
-      limits: snap.limits,
-      pausedUntil: g.paused,
-    }
+    const body = { updatedAt: new Date(await $.clock.now()).toISOString(), limits: snap.limits }
     await $.fs.write(path, JSON.stringify(body, null, 2))
   } catch {
     // best effort : le fichier partagé ne doit jamais casser le bandeau
@@ -161,64 +152,7 @@ async function ensureStats($: EngineInterface, startedAt?: number) {
   await update($, stats, s => (isCurrent(s, current) ? s : emptyStats(current)))
 }
 
-/** Le minuteur de reprise : une variable du module, réarmée depuis l'état après un rechargement. */
-let resumeTimer: Timer | undefined
-
-const limitsNow = async ($: EngineInterface) => (await read($, usage))?.limits ?? []
-
-function clearPause($: EngineInterface) {
-  resumeTimer?.cancel()
-  resumeTimer = undefined
-  $.ui.status(undefined)
-  return update($, guard, g => ({ ...g, paused: undefined }))
-}
-
-/** Arme la relance pour `at` ; à l'échéance, vérifie que la fenêtre est vraiment repartie. */
-function armResume($: EngineInterface, cfg: GuardConfig, at: number, now: number) {
-  resumeTimer?.cancel()
-  $.ui.status(`⏸ quotas : reprise auto vers ${clockTime(at)}`)
-  resumeTimer = $.clock.after(Math.max(1000, at - now), () => void resume($, cfg))
-}
-
-async function resume($: EngineInterface, cfg: GuardConfig) {
-  resumeTimer = undefined
-  const fresh = (await $.session.usage()).rateLimits
-  const limits = fresh.length ? fresh : await limitsNow($)
-  const now = await $.clock.now()
-  const s = guardStatus(limits, cfg, now)
-  if (s.level !== 'ok' && s.resumeAt && s.resumeAt > now) {
-    await update($, guard, g => ({ ...g, paused: s.resumeAt }))
-    return armResume($, cfg, s.resumeAt, now)
-  }
-  await clearPause($)
-  await update($, guard, g => ({ ...g, calls: 0 }))
-  await $.prompt.submit({ text: resumePrompt(limits, now) })
-}
-
-/** Fin d'un échange où le garde-fou est intervenu : Claude s'est arrêté, on programme la relance. */
-async function pauseIfStopped($: EngineInterface, cfg: GuardConfig) {
-  const g = await read($, guard)
-  await update($, guard, x => ({ ...x, intervened: false }))
-  if (!g.intervened || !cfg.resume) return
-  const now = await $.clock.now()
-  const s = guardStatus(await limitsNow($), cfg, now)
-  if (s.level === 'ok' || !s.resumeAt) return
-  await update($, guard, x => ({ ...x, paused: s.resumeAt }))
-  armResume($, cfg, s.resumeAt, now)
-  $.ui.toast(
-    `⏸ Pause quotas : ${s.worst?.label} à ${Math.round(s.worst?.used ?? 0)} %. Reprise automatique au reset.`,
-  )
-}
-
-export const register: Register = (on, options) => {
-  const cfg = config(options)
-
-  // tu reprends la main : la relance automatique n'a plus lieu d'être
-  on('prompt.submit', async ($, e, next) => {
-    if (e.origin.kind !== 'plugin' && (await read($, guard)).paused) await clearPause($)
-    return next(e)
-  })
-
+export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     const result = await next(e)
     version = await readVersion($)
@@ -226,20 +160,6 @@ export const register: Register = (on, options) => {
       name: 'rythme',
       description: 'Résumé de tes limites Claude, du contexte et de la session en cours',
     })
-    // un hôte qui ne prend pas les outils de plugin ne doit pas priver le bandeau de sa mesure
-    await $.tool
-      .register({
-        name: TOOL,
-        description:
-          'Lit tes limites d’abonnement Claude (Session 5 h, Semaine 7 j) : % utilisé, heure du reset, rythme, ' +
-          'et l’état du garde-fou (seuil, arrêt, reprise auto). Appelle-le avant une étape longue ou un lot de ' +
-          'sous-agents, et régulièrement pendant une tâche longue, pour décider seul de ralentir ou de faire une pause.',
-        inputSchema: { type: 'object', properties: {} },
-        isDeferred: false,
-      })
-      .catch(() => undefined)
-    const paused = (await read($, guard)).paused
-    if (paused && cfg.resume) armResume($, cfg, paused, await $.clock.now())
     const now = await $.session.usage()
     await ensureStats($, now.startedAt)
     if (!now.rateLimits.length) await loadShared($)
@@ -271,19 +191,9 @@ export const register: Register = (on, options) => {
     return result
   })
 
-  // un seul hook d'outil : l'outil quotas, le garde-fou (refus à l'arrêt, rappels au seuil), puis le chrono
+  // le chrono des outils
   on('tool.call', async ($, e, next) => {
     const start = await $.clock.now()
-    const limits = await limitsNow($)
-    if (e.tool === `mcp__usage-pace__${TOOL}`) {
-      return { result: report(limits, cfg, start, (await read($, guard)).paused) }
-    }
-    const level = guardStatus(limits, cfg, start)
-    const deny = stopDenial(e.tool, level, cfg, start)
-    if (deny) {
-      await update($, guard, g => ({ ...g, intervened: true }))
-      return { deny }
-    }
     const result = await next(e)
     const end = await $.clock.now()
 
@@ -302,12 +212,7 @@ export const register: Register = (on, options) => {
     await update($, stats, s =>
       s ? withTool(s, { key, ms: end - start, file, timed: !asked && !isAgent }) : s,
     )
-
-    if (level.level === 'ok' || result.deny !== undefined || result.isError) return result
-    const g = await read($, guard)
-    const due = g.calls === 0 || g.calls >= REMIND_EVERY
-    await update($, guard, x => ({ ...x, calls: due ? 1 : x.calls + 1, intervened: x.intervened || due }))
-    return due ? { ...result, context: [...(result.context ?? []), reminder(level, cfg, start)] } : result
+    return result
   })
 
   on('turn.complete', async ($, e, next) => {
@@ -318,7 +223,6 @@ export const register: Register = (on, options) => {
       await update($, pending, () => ({ spans: [], asked: [] }))
       await ensureStats($)
       await update($, stats, s => (s ? withTurn(s, time, e.usage) : s))
-      await pauseIfStopped($, cfg)
     }
     return next(e)
   })
@@ -329,9 +233,6 @@ export const register: Register = (on, options) => {
     const snap = await read($, usage)
     if (!snap) return { text: NO_DATA }
     const now = await $.clock.now()
-    const garde = report(snap.limits, cfg, now, (await read($, guard)).paused)
-      .split('\n')
-      .filter(l => !l.startsWith('- '))
     const surfaces = (await $.session.surfaces().catch(() => [])).join(', ') || 'aucune'
     const drawn = lastDraw
       ? `dessiné pour ${lastDraw.surface} sur ${lastDraw.columns} colonnes`
@@ -339,7 +240,7 @@ export const register: Register = (on, options) => {
     const affichage =
       `Affichage (usage-pace ${version}) : bandeau ${drawn} ; surfaces de la session : ${surfaces} ; ` +
       `reconnexions : ${attaches}`
-    return { text: [summary(snap, await read($, stats), now), ...garde, affichage].join('\n') }
+    return { text: [summary(snap, await read($, stats), now), affichage].join('\n') }
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {

@@ -38,7 +38,6 @@ function engine(on: On, session = { startedAt: NOW }) {
   on('session.measure', (_$, e) => ({ changed: e.changed }))
   on('session.attach', (_$, e) => ({ clientId: e.clientId }))
   on('command.register', () => ({ value: undefined }) as never)
-  on('tool.register', () => ({ value: { tool: 'mcp__usage-pace__quotas' } }) as never)
   on('session.start', () => ({ cwd: '/projet' }))
   on(
     'session.usage',
@@ -134,7 +133,6 @@ test('au démarrage, le dernier relevé s’affiche avant la première réponse'
   mock.clock(on, { now: NOW })
   mock.store(on)
   on('command.register', () => ({ value: undefined }) as never)
-  on('tool.register', () => ({ value: { tool: 'mcp__usage-pace__quotas' } }) as never)
   on('session.start', () => ({ cwd: '/projet' }))
   on('env.get', () => ({ value: '/home/toi' }) as never)
   on('fs.write', () => ({ value: undefined }) as never)
@@ -265,69 +263,4 @@ test('/clear : les compteurs repartent de zéro et reviennent, sans nouveau sess
   expect(await ui.find({ type: 'Text', text: /1 échange/ })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /0 outil/ })).toBeDefined()
   await ui.unmount()
-})
-
-test('garde-fou : à 92 % de session, Bash est refusé, Write passe, et l’outil quotas répond', async ($, on) => {
-  engine(on)
-  on('tool.call', () => ({ result: {} }))
-  const high = [
-    { kind: 'five_hour', percentUsed: 92, resetsAt: at(1 * H) },
-    { kind: 'seven_day', percentUsed: 40, resetsAt: at(3 * DAY) },
-  ]
-  await $.session.measure({ context: CONTEXT, rateLimits: high, changed: ['rateLimits'] })
-
-  const bash = await $.tool.call({ tool: 'Bash', command: 'npm test' } as never)
-  expect(String(bash.deny)).toContain('Pause : quota Session à 92 %')
-
-  const write = await $.tool.call({
-    tool: 'Write',
-    input: { file_path: 'PROGRESS.md', content: 'x' },
-  } as never)
-  expect(write.deny).toBeUndefined()
-
-  const quotas = await $.tool.call({ tool: 'mcp__usage-pace__quotas' } as never)
-  expect(String(quotas.result)).toContain('- Session : 92 % utilisé')
-})
-
-test('garde-fou : Claude s’arrête, et la tâche est relancée toute seule après le reset', async ($, on) => {
-  const clock = engine(on)
-  const submitted: string[] = []
-  on('tool.call', () => ({ result: {} }))
-  on('turn.complete', (_$, e) => ({ text: e.answer }))
-  on('prompt.submit', (_$, e) => (submitted.push(e.text), { text: e.text }))
-  await $.session.start({ cwd: '/projet', surface: 'terminal', isInteractive: true } as never)
-  const high = [
-    { kind: 'five_hour', percentUsed: 92, resetsAt: at(1 * H) },
-    { kind: 'seven_day', percentUsed: 40, resetsAt: at(3 * DAY) },
-  ]
-  await $.session.measure({ context: CONTEXT, rateLimits: high, changed: ['rateLimits'] })
-
-  await $.tool.call({ tool: 'Bash', command: 'npm test' } as never)
-  await $.turn.complete({
-    answer: 'pause',
-    durationMs: 1000,
-    isAborted: false,
-    turnId: 't1',
-    reason: 'answer',
-  } as never)
-  expect(submitted).toEqual([])
-
-  await clock.advance(1 * H + 3 * MIN)
-  expect(submitted.length).toBe(1)
-  expect(submitted[0]).toContain('Reprends la tâche en cours')
-})
-
-test('garde-fou : à 82 %, l’outil tourne et Claude reçoit le rappel une fois, pas à chaque appel', async ($, on) => {
-  engine(on)
-  on('tool.call', () => ({ result: {} }))
-  const warm = [
-    { kind: 'five_hour', percentUsed: 82, resetsAt: at(1 * H) },
-    { kind: 'seven_day', percentUsed: 40, resetsAt: at(3 * DAY) },
-  ]
-  await $.session.measure({ context: CONTEXT, rateLimits: warm, changed: ['rateLimits'] })
-  const first = await $.tool.call({ tool: 'Bash', command: 'ls' } as never)
-  expect(first.deny).toBeUndefined()
-  expect(String(first.context?.[0])).toContain('Quota Session à 82 %')
-  const second = await $.tool.call({ tool: 'Bash', command: 'ls' } as never)
-  expect(second.context ?? []).toEqual([])
 })

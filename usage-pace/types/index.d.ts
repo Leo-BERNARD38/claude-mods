@@ -46,16 +46,6 @@ export type ToolSpan = { start: number; end: number; asked: boolean }
 /** L'échange en cours, gardé dans l'état pour survivre à un rechargement du mod. */
 export type PendingTurn = { spans: ToolSpan[]; asked: string[] }
 
-/** Le garde-fou de la session : relance prévue, appels depuis le dernier rappel, intervention en cours. */
-export type GuardState = {
-  /** relance automatique prévue à (ms epoch) */
-  paused?: number
-  /** appels d'outils depuis le dernier rappel */
-  calls: number
-  /** le garde-fou a rappelé ou refusé pendant l'échange en cours */
-  intervened: boolean
-}
-
 declare module 'claude-code' {
   interface PluginState {
     'usage-pace': {
@@ -63,7 +53,6 @@ declare module 'claude-code' {
       stats: SessionStats | null
       pending: PendingTurn
       tick: number
-      guard: GuardState
     }
   }
 }
