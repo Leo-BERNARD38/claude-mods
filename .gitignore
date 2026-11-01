@@ -1,0 +1,3 @@
+# types que le moteur dépose à côté de chaque mod (pour tsc), régénérés à chaque chargement
+**/.claude-plugin/types/
+node_modules/

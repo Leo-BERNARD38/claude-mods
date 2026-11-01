@@ -1,0 +1,33 @@
+{
+  "name": "usage-pace-guard",
+  "version": "1.0.0",
+  "description": "Garde-fou des quotas pour les agents : Claude lit ses limites, ralentit, s'arrête au quota permis et reprend tout seul. Ne bloque jamais une session où tu travailles.",
+  "author": { "name": "Léo" },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "semaine_marge": {
+      "type": "number",
+      "title": "Semaine : avance permise (points)",
+      "description": "Quota Semaine permis = % de temps écoulé + cette marge. 14 ≈ un jour d'avance",
+      "default": 14
+    },
+    "semaine_plafond": {
+      "type": "number",
+      "title": "Semaine : plafond (%)",
+      "description": "Le quota Semaine permis ne dépasse jamais ce %",
+      "default": 100
+    },
+    "session_arret": {
+      "type": "number",
+      "title": "Session 5 h : arrêt des agents (%)",
+      "description": "Au-dessus, les outils des agents sont refusés ; le reste est ta réserve",
+      "default": 80
+    },
+    "reprise_auto": {
+      "type": "boolean",
+      "title": "Reprise automatique",
+      "description": "Relancer la tâche toute seule quand le quota le permet de nouveau",
+      "default": true
+    }
+  }
+}

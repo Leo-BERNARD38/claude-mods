@@ -29,25 +29,8 @@ Le contexte a ses propres couleurs (bleu, rose, turquoise, orange), distinctes d
 
 `/rythme` donne le même résumé en texte.
 
-## Garde-fou : Claude gère lui-même ses quotas
-
-Pour lancer une longue tâche sans te priver du chat :
-
-| Quand | Ce qui se passe |
-| --- | --- |
-| à tout moment | Claude a un outil `quotas` : % Session / Semaine, heure du reset, rythme. Il l'appelle avant une étape lourde. |
-| ≥ **seuil** (80 %) | après un résultat d'outil, Claude lit un rappel : finir l'étape, noter l'avancement dans un fichier, s'arrêter. Rappel répété tous les 15 appels. |
-| ≥ **seuil d'arrêt** (90 %) | les outils sont refusés, sauf `Write`/`Edit`/`Read` et les tâches, pour noter où il en est. Sous-agents compris. |
-| fin de l'échange | si le garde-fou est intervenu : pause, la barre d'état affiche l'heure de reprise. |
-| reset passé (+2 min) | la tâche est relancée par un prompt automatique (« relis ton fichier d'avancement, puis continue »). |
-| tu écris toi-même | la relance prévue est annulée : tu as repris la main. |
-
-Réglages (menu `/config`, ou `pluginConfigs.usage-pace` dans `settings.json`) : `seuil`, `seuil_arret`, `reprise_auto`.
-La relance tient tant que la session reste ouverte (un rechargement du mod la réarme).
-
-**Mode projet / Cowork** : l'app y charge les skills des plugins, pas leurs hooks. Le skill `quotas` du mod
-s'en charge : quand l'outil manque, il copie le mod dans les mods de la session et te demande « Turn them on »
-(une fois par session). Ensuite tout marche comme dans Claude Code.
+Purement informatif : ce mod ne bloque jamais rien. Pour que Claude gère lui-même ses quotas (ralentir,
+s'arrêter, reprendre), c'est l'autre mod, [usage-pace-guard](../usage-pace-guard).
 
 Les limites sont aussi écrites dans `~/.usage-pace/quotas.json` (avec `updatedAt`) à chaque mesure,
 pour les Claude qui ne chargent pas le mod, par exemple une session de l'app reliée à ce PC.
@@ -95,8 +78,6 @@ Prérequis : Claude Code 2.1.287 ou plus récent, et un abonnement Pro ou Max po
 | --- | --- |
 | `hooks/register.tsx` | câblage : quels évènements alimentent quelles données |
 | `hooks/limits.ts` | rythme, verdicts et alertes des limites |
-| `skills/quotas/SKILL.md` | charge le garde-fou là où les hooks ne tournent pas (mode projet, Cowork) |
-| `hooks/guard.ts` | garde-fou : seuils, rappel, refus, reprise, réponse de l'outil `quotas` |
 | `hooks/context.ts` | remplissage, composition et compaction du contexte |
 | `hooks/session.ts` | compteurs de la session en cours |
 | `hooks/timing.ts` | répartition du temps et outil le plus lent |
