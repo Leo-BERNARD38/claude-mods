@@ -84,7 +84,7 @@ test('USAGE_PACE_AGENT=1 : agent même quand le message vient du SDK', async ($,
   expect((await $.tool.call({ tool: 'Bash', command: 'ls' } as never)).deny).toBeDefined()
 })
 
-test('/debloquer : lève l’arrêt tout de suite, relance la tâche en pause ; off le réactive', async ($, on) => {
+test('/usage-pace:debloquer : lève l’arrêt tout de suite, relance la tâche en pause ; off le réactive', async ($, on) => {
   const { clock, files, submitted } = engine(on, { USAGE_PACE_AGENT: '1' })
   await $.session.start({ cwd: '/projet', surface: null, isInteractive: false } as never)
   await $.tool.call({ tool: 'Bash', command: 'ls' } as never)
@@ -104,7 +104,7 @@ test('/debloquer : lève l’arrêt tout de suite, relance la tâche en pause ; 
   expect((await $.tool.call({ tool: 'Bash', command: 'ls' } as never)).deny).toBeDefined()
 })
 
-test('/debloquer lancé dans une autre session : l’agent en pause reprend sans attendre le reset', async ($, on) => {
+test('/usage-pace:debloquer lancé dans une autre session : l’agent en pause reprend sans attendre le reset', async ($, on) => {
   const { clock, files, submitted } = engine(on, { USAGE_PACE_AGENT: '1' })
   await $.session.start({ cwd: '/projet', surface: null, isInteractive: false } as never)
   await $.tool.call({ tool: 'Bash', command: 'ls' } as never)

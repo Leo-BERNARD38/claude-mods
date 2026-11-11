@@ -1,4 +1,4 @@
-// Le câblage du garde-fou : mesures, outil quotas, rappels, refus, pause, reprise, /debloquer.
+// Le câblage du garde-fou : mesures, outil quotas, rappels, refus, pause, reprise, /usage-pace:debloquer.
 // Les calculs sont dans guard.ts.
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, PromptOrigin, Register, Timer } from 'claude-code'
@@ -34,7 +34,7 @@ const AGENT_ORIGINS = new Set<PromptOrigin['kind']>([
 /** Ni toi ni un agent : on garde le mode en cours. */
 const NEUTRAL_ORIGINS = new Set<PromptOrigin['kind']>(['task-notification', 'unclassified'])
 
-/** Pendant une pause, on regarde à ce rythme si /debloquer a été lancé ailleurs. */
+/** Pendant une pause, on regarde à ce rythme si /usage-pace:debloquer a été lancé ailleurs. */
 const POLL_MS = 30_000
 /** La suspension est relue au plus à ce rythme (elle est lue à chaque appel d'outil). */
 const SUSPENSION_TTL_MS = 5_000
@@ -49,7 +49,7 @@ const suspensionFile = async ($: EngineInterface) => {
   return home ? `${home}/.usage-pace/garde-fou.json` : undefined
 }
 
-/** /debloquer, posé depuis n'importe quelle session : un fichier, pour que tous les agents le voient. */
+/** /usage-pace:debloquer, posé depuis n'importe quelle session : un fichier, pour que tous les agents le voient. */
 async function suspension($: EngineInterface, fresh = false): Promise<number | undefined> {
   const now = await $.clock.now()
   if (!fresh && cache && now - cache.at < SUSPENSION_TTL_MS) return cache.until
@@ -84,7 +84,7 @@ function armResume($: EngineInterface, cfg: Config, at: number, now: number) {
   resumeTimer = $.clock.after(Math.max(1000, at - now), () => void resume($, cfg))
 }
 
-/** À l'échéance (ou après /debloquer) : relance si le quota le permet, sinon réarme. */
+/** À l'échéance (ou après /usage-pace:debloquer) : relance si le quota le permet, sinon réarme. */
 async function resume($: EngineInterface, cfg: Config) {
   const fresh = (await $.session.usage()).rateLimits
   if (fresh.length) await update($, limits, () => fresh.map(l => ({ ...l })))
@@ -113,8 +113,6 @@ export const register: Register = (on, options) => {
       name: CMD,
       description: `Lève l’arrêt des agents (quotas) : jusqu’au reset, ou /${CMD} 2h, ou /${CMD} off`,
     })
-    // ancien nom, gardé comme alias
-    await $.command.register({ name: 'debloquer', description: `Alias de /${CMD}` })
     await $.tool
       .register({
         name: 'quotas',
@@ -130,7 +128,7 @@ export const register: Register = (on, options) => {
     if (usage.rateLimits.length) await update($, limits, () => usage.rateLimits.map(l => ({ ...l })))
     const paused = (await read($, guard)).paused
     if (paused && cfg.resume) armResume($, cfg, paused, await $.clock.now())
-    // une pause levée par /debloquer dans une autre session
+    // une pause levée par /usage-pace:debloquer dans une autre session
     $.clock.every(POLL_MS, async () => {
       if ((await read($, guard)).paused && (await suspension($, true))) await resume($, cfg)
     })
@@ -149,8 +147,8 @@ export const register: Register = (on, options) => {
       const human = !AGENT_ORIGINS.has(kind)
       // un message d'agent glissé dans ton tour ne te transforme pas en agent
       if (human || !e.turnId) await update($, mode, () => (human ? 'you' : 'agent'))
-      // tu reprends la main : la relance automatique n'a plus lieu d'être (sauf /debloquer, qui relance)
-      if (human && e.command?.name !== 'debloquer' && e.command?.name !== CMD && (await read($, guard)).paused) await clearPause($)
+      // tu reprends la main : la relance automatique n'a plus lieu d'être (sauf /usage-pace:debloquer, qui relance)
+      if (human && e.command?.name !== CMD && (await read($, guard)).paused) await clearPause($)
     }
     return next(e)
   })
@@ -197,7 +195,7 @@ export const register: Register = (on, options) => {
     return next(e)
   })
 
-  for (const command of [CMD, 'debloquer']) on('command.run', { command }, async ($, e) => {
+  on('command.run', { command: CMD }, async ($, e) => {
     const now = await $.clock.now()
     const r = unlockUntil(e.args, await read($, limits), cfg, now)
     if ('error' in r) return { text: r.error }

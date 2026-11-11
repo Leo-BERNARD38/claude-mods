@@ -46,8 +46,6 @@ Une session cloud lancée depuis le web ou par l'API arrive comme « SDK », don
 
 ## Débloquer à la main : `/usage-pace:debloquer`
 
-(L'ancien nom `/debloquer` reste disponible comme alias.)
-
 - `/usage-pace:debloquer` : lève l'arrêt tout de suite, relance la tâche en pause, et suspend le garde-fou jusqu'au
   reset de la fenêtre qui bloquait ;
 - `/usage-pace:debloquer 2h` (ou `30min`, `1h30`, `1j`) : pour cette durée ;
