@@ -20,4 +20,4 @@ $settings.env | Add-Member -Force CLAUDE_CODE_PLUGIN_DIRS (($dirs + $mod) -join 
 
 [IO.File]::WriteAllText($file, ($settings | ConvertTo-Json -Depth 20))
 Write-Host "usage-pace-guard installé depuis $mod"
-Write-Host "Ouvre une nouvelle session Claude Code : le garde-fou y est actif (outil quotas, /debloquer)."
+Write-Host "Ouvre une nouvelle session Claude Code : le garde-fou y est actif (outil quotas, /usage-pace:debloquer)."

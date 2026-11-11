@@ -19,4 +19,4 @@ fs.writeFileSync(file, JSON.stringify(settings, null, 2) + '\n')
 JS
 
 echo "usage-pace-guard installé depuis $MOD"
-echo "Ouvre une nouvelle session Claude Code : le garde-fou y est actif (outil quotas, /debloquer)."
+echo "Ouvre une nouvelle session Claude Code : le garde-fou y est actif (outil quotas, /usage-pace:debloquer)."

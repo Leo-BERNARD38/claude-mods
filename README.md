@@ -5,7 +5,7 @@ Mods Claude Code de Léo.
 | Mod | Ce qu'il fait |
 | --- | --- |
 | [usage-pace](./usage-pace) | Bandeau des limites Session / Semaine, contexte et session, et `/rythme`. Purement informatif, ne bloque rien |
-| [usage-pace-guard](./usage-pace-guard) | Garde-fou pour les agents : Claude règle son rythme pour finir la semaine près de 100 %, s'arrête au quota permis et reprend tout seul ; `/debloquer`. Ne bloque jamais ta session |
+| [usage-pace-guard](./usage-pace-guard) | Garde-fou pour les agents : Claude règle son rythme pour finir la semaine près de 100 %, s'arrête au quota permis et reprend tout seul ; `/usage-pace:debloquer`. Ne bloque jamais ta session |
 
 Les deux sont indépendants : installe le bandeau là où tu travailles, le garde-fou là où tournent tes agents.
 

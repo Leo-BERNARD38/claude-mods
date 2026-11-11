@@ -72,7 +72,7 @@ test('ta session n’est jamais bloquée : rappel seulement', async () => {
   expect(reminder(s, 'you')).toContain("rien n'est bloqué")
 })
 
-test('suspendu par /debloquer : rien ne bloque jusqu’à l’échéance', async () => {
+test('suspendu par /usage-pace:debloquer : rien ne bloque jusqu’à l’échéance', async () => {
   const s = status(limits(95, 10), cfg, NOW, 'agent', NOW + HOUR)
   expect(s.level).toBe('ok')
   expect(report(limits(95, 10), cfg, NOW, 'agent', { suspended: NOW + HOUR })).toContain(
@@ -82,7 +82,7 @@ test('suspendu par /debloquer : rien ne bloque jusqu’à l’échéance', async
   expect(status(limits(95, 10), cfg, NOW, 'agent', NOW - MIN).level).toBe('stop')
 })
 
-test('/debloquer : jusqu’au reset de la fenêtre qui bloque, une durée, ou off', async () => {
+test('/usage-pace:debloquer : jusqu’au reset de la fenêtre qui bloque, une durée, ou off', async () => {
   expect(unlockUntil('', limits(85, 10), cfg, NOW)).toEqual({
     until: NOW + 2 * HOUR,
     why: "jusqu'au reset Session",

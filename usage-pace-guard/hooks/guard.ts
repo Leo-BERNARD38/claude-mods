@@ -41,7 +41,7 @@ export type Status = {
   worst?: Window
   /** à l'arrêt : quand reprendre (ms epoch) */
   resumeAt?: number
-  /** /debloquer : garde-fou suspendu jusqu'à (ms epoch) */
+  /** /usage-pace:debloquer : garde-fou suspendu jusqu'à (ms epoch) */
   suspended?: number
 }
 
@@ -229,7 +229,7 @@ export function report(
     ...lines,
     `${who} ${rules}`,
     ...(s.suspended
-      ? [`Garde-fou suspendu jusqu'à ${clock(s.suspended)} (/debloquer off pour le réactiver).`]
+      ? [`Garde-fou suspendu jusqu'à ${clock(s.suspended)} (/usage-pace:debloquer off pour le réactiver).`]
       : []),
     ...(extra.paused ? [`En pause, relance prévue ${clock(extra.paused)}.`] : []),
   ].join('\n')
@@ -248,7 +248,7 @@ export function parseDuration(text: string): number | null {
 }
 
 /**
- * /debloquer : jusqu'à quand suspendre le garde-fou.
+ * /usage-pace:debloquer : jusqu'à quand suspendre le garde-fou.
  * Sans argument : jusqu'au reset de la fenêtre qui bloque (ou qui rappelle, sinon la Session).
  */
 export function unlockUntil(
