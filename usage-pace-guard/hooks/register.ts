@@ -99,6 +99,9 @@ async function resume($: EngineInterface, cfg: Config) {
   await $.prompt.submit({ text: RESUME_PROMPT })
 }
 
+/** Nom de la commande, préfixé comme le plugin pour être facile à retrouver : /usage-pace:debloquer. */
+const CMD = 'usage-pace:debloquer'
+
 export const register: Register = (on, options) => {
   const cfg = config(options)
 
@@ -107,9 +110,11 @@ export const register: Register = (on, options) => {
     const env = await $.env.get('USAGE_PACE_AGENT')
     forced = env === '1' ? 'agent' : env === '0' ? 'you' : undefined
     await $.command.register({
-      name: 'debloquer',
-      description: 'Lève l’arrêt des agents (quotas) : jusqu’au reset, ou /debloquer 2h, ou /debloquer off',
+      name: CMD,
+      description: `Lève l’arrêt des agents (quotas) : jusqu’au reset, ou /${CMD} 2h, ou /${CMD} off`,
     })
+    // ancien nom, gardé comme alias
+    await $.command.register({ name: 'debloquer', description: `Alias de /${CMD}` })
     await $.tool
       .register({
         name: 'quotas',
@@ -145,7 +150,7 @@ export const register: Register = (on, options) => {
       // un message d'agent glissé dans ton tour ne te transforme pas en agent
       if (human || !e.turnId) await update($, mode, () => (human ? 'you' : 'agent'))
       // tu reprends la main : la relance automatique n'a plus lieu d'être (sauf /debloquer, qui relance)
-      if (human && e.command?.name !== 'debloquer' && (await read($, guard)).paused) await clearPause($)
+      if (human && e.command?.name !== 'debloquer' && e.command?.name !== CMD && (await read($, guard)).paused) await clearPause($)
     }
     return next(e)
   })
@@ -192,7 +197,7 @@ export const register: Register = (on, options) => {
     return next(e)
   })
 
-  on('command.run', { command: 'debloquer' }, async ($, e) => {
+  for (const command of [CMD, 'debloquer']) on('command.run', { command }, async ($, e) => {
     const now = await $.clock.now()
     const r = unlockUntil(e.args, await read($, limits), cfg, now)
     if ('error' in r) return { text: r.error }
@@ -215,7 +220,7 @@ export const register: Register = (on, options) => {
     return {
       text:
         `Garde-fou suspendu jusqu'à ${clock(until)} (${r.why}), pour tous les agents de cette machine. ` +
-        `${wasPaused ? 'La tâche en pause reprend. ' : ''}/debloquer off pour le réactiver.`,
+        `${wasPaused ? 'La tâche en pause reprend. ' : ''}/${CMD} off pour le réactiver.`,
     }
   })
 }

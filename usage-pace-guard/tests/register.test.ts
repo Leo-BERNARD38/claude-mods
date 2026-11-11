@@ -40,7 +40,7 @@ const turn = (id: string) =>
 const prompt = (kind: string) => ({ text: 'go', wait: false, origin: { kind } }) as never
 const debloquer = (args: string) =>
   ({
-    command: 'debloquer',
+    command: 'usage-pace:debloquer',
     args,
     origin: { kind: 'composer' },
     presentation: { isFullscreen: false, columns: 120 },

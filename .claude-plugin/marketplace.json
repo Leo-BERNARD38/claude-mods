@@ -13,7 +13,7 @@
     {
       "name": "usage-pace-guard",
       "source": "./usage-pace-guard",
-      "description": "Garde-fou des quotas pour les agents : ralentit, s'arrête au quota permis (qui suit le temps de la semaine), reprend tout seul ; /debloquer. Ne bloque jamais ta session"
+      "description": "Garde-fou des quotas pour les agents : ralentit, s'arrête au quota permis (qui suit le temps de la semaine), reprend tout seul ; /usage-pace:debloquer. Ne bloque jamais ta session"
     }
   ]
 }

@@ -44,16 +44,18 @@ Une session cloud lancée depuis le web ou par l'API arrive comme « SDK », don
 | quota de nouveau permis | la tâche est relancée par un prompt automatique (« relis ton fichier d'avancement »). |
 | tu écris toi-même | la relance prévue est annulée : tu as repris la main. |
 
-## Débloquer à la main : `/debloquer`
+## Débloquer à la main : `/usage-pace:debloquer`
 
-- `/debloquer` : lève l'arrêt tout de suite, relance la tâche en pause, et suspend le garde-fou jusqu'au
+(L'ancien nom `/debloquer` reste disponible comme alias.)
+
+- `/usage-pace:debloquer` : lève l'arrêt tout de suite, relance la tâche en pause, et suspend le garde-fou jusqu'au
   reset de la fenêtre qui bloquait ;
-- `/debloquer 2h` (ou `30min`, `1h30`, `1j`) : pour cette durée ;
-- `/debloquer off` : réactive le garde-fou tout de suite.
+- `/usage-pace:debloquer 2h` (ou `30min`, `1h30`, `1j`) : pour cette durée ;
+- `/usage-pace:debloquer off` : réactive le garde-fou tout de suite.
 
 La suspension est notée dans `~/.usage-pace/garde-fou.json` : tous les agents de la machine la voient,
 sous-agents compris, et un agent en pause reprend dans les 30 s. L'outil `quotas` affiche
-« Garde-fou suspendu jusqu'à … ». (Une session cloud a son propre disque : lance `/debloquer` dans celle-ci.)
+« Garde-fou suspendu jusqu'à … ». (Une session cloud a son propre disque : lance `/usage-pace:debloquer` dans celle-ci.)
 
 ## Réglages
 
@@ -82,7 +84,7 @@ s'en charge : il copie le mod dans les mods de la session et te demande « Turn 
 
 | Fichier | Rôle |
 | --- | --- |
-| `hooks/guard.ts` | les calculs : seuils, rappel, refus, conseil, `/debloquer` |
+| `hooks/guard.ts` | les calculs : seuils, rappel, refus, conseil, `/usage-pace:debloquer` |
 | `hooks/register.ts` | le câblage : mesures, outil `quotas`, mode agent / toi, pause, reprise |
 | `skills/quotas/SKILL.md` | charge le garde-fou là où les hooks ne tournent pas (mode projet, Cowork) |
 | `types/index.d.ts` | l'état du mod |
