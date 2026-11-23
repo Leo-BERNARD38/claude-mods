@@ -1,10 +1,11 @@
-// Le câblage du garde-fou : mesures, outil quotas, rappels, refus, pause, reprise, /usage-pace:debloquer.
+// Le câblage du garde-fou : mesures, outils quotas et debloquer, rappels, refus, pause, reprise, /debloquer.
 // Les calculs sont dans guard.ts.
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, PromptOrigin, Register, Timer } from 'claude-code'
 
 import {
   REMIND_EVERY,
+  REFUSED_UNLOCK,
   RESUME_PROMPT,
   clock,
   config,
@@ -34,7 +35,10 @@ const AGENT_ORIGINS = new Set<PromptOrigin['kind']>([
 /** Ni toi ni un agent : on garde le mode en cours. */
 const NEUTRAL_ORIGINS = new Set<PromptOrigin['kind']>(['task-notification', 'unclassified'])
 
-/** Pendant une pause, on regarde à ce rythme si /usage-pace:debloquer a été lancé ailleurs. */
+/** Ceux qui tapent eux-mêmes : seuls eux peuvent lever l'arrêt (commande, skill, outil debloquer). */
+const HUMAN_ORIGINS = new Set<PromptOrigin['kind']>(['composer', 'bridge', 'sdk'])
+
+/** Pendant une pause, on regarde à ce rythme si un déblocage a été posé ailleurs. */
 const POLL_MS = 30_000
 /** La suspension est relue au plus à ce rythme (elle est lue à chaque appel d'outil). */
 const SUSPENSION_TTL_MS = 5_000
@@ -43,20 +47,55 @@ const SUSPENSION_TTL_MS = 5_000
 let forced: Mode | undefined
 let resumeTimer: Timer | undefined
 let cache: { until?: number; at: number } | undefined
+/** Le tour en cours a été lancé par un message de la personne (même si USAGE_PACE_AGENT=1). */
+let humanTurn = false
 
 const suspensionFile = async ($: EngineInterface) => {
   const home = (await $.env.get('USERPROFILE')) ?? (await $.env.get('HOME'))
   return home ? `${home}/.usage-pace/garde-fou.json` : undefined
 }
 
-/** /usage-pace:debloquer, posé depuis n'importe quelle session : un fichier, pour que tous les agents le voient. */
-async function suspension($: EngineInterface, fresh = false): Promise<number | undefined> {
+/** Pose la suspension (ou la lève, avec off) dans le fichier, relance la tâche en pause. */
+async function applyUnlock($: EngineInterface, cfg: Config, args: string): Promise<string> {
+  const now = await $.clock.now()
+  const r = unlockUntil(args, await read($, limits), cfg, now)
+  if ('error' in r) return r.error
+  const path = await suspensionFile($)
+  if (!path) return 'Pas de dossier personnel (HOME) où noter la suspension.'
+  if ('off' in r) {
+    await $.fs.write(path, JSON.stringify({ setAt: now }, null, 2))
+    cache = { at: now }
+    return 'Garde-fou réactivé.'
+  }
+  await $.fs.write(path, JSON.stringify({ until: r.until, setAt: now }, null, 2))
+  cache = { until: r.until, at: now }
+  const wasPaused = (await read($, guard)).paused
+  if (wasPaused) {
+    await clearPause($)
+    // pas depuis la commande ou l'outil (ils tiennent le tour) : juste après
+    $.clock.after(1000, () => void $.prompt.submit({ text: RESUME_PROMPT }))
+  }
+  return (
+    `Garde-fou suspendu jusqu'à ${clock(r.until)} (${r.why}), pour tous les agents de cette machine. ` +
+    `${wasPaused ? 'La tâche en pause reprend. ' : ''}/debloquer off pour le réactiver.`
+  )
+}
+
+/**
+ * La suspension, posée depuis n'importe quelle session : un fichier, pour que tous les agents le voient.
+ * Le skill debloquer y écrit { "demande": "2h" | "reset" | "off" } (sans horloge) : on la convertit ici.
+ */
+async function suspension($: EngineInterface, cfg: Config, fresh = false): Promise<number | undefined> {
   const now = await $.clock.now()
   if (!fresh && cache && now - cache.at < SUSPENSION_TTL_MS) return cache.until
   let until: number | undefined
   try {
     const path = await suspensionFile($)
-    const body = path ? (JSON.parse(await $.fs.read(path)) as { until?: unknown }) : {}
+    const body = path ? (JSON.parse(await $.fs.read(path)) as { until?: unknown; demande?: unknown }) : {}
+    if (typeof body.demande === 'string' && body.until === undefined) {
+      await applyUnlock($, cfg, body.demande === 'reset' ? '' : body.demande)
+      return cache?.until
+    }
     if (typeof body.until === 'number' && body.until > now) until = body.until
   } catch {
     // pas de fichier : pas de suspension
@@ -84,12 +123,12 @@ function armResume($: EngineInterface, cfg: Config, at: number, now: number) {
   resumeTimer = $.clock.after(Math.max(1000, at - now), () => void resume($, cfg))
 }
 
-/** À l'échéance (ou après /usage-pace:debloquer) : relance si le quota le permet, sinon réarme. */
+/** À l'échéance (ou après un déblocage) : relance si le quota le permet, sinon réarme. */
 async function resume($: EngineInterface, cfg: Config) {
   const fresh = (await $.session.usage()).rateLimits
   if (fresh.length) await update($, limits, () => fresh.map(l => ({ ...l })))
   const now = await $.clock.now()
-  const s = status(await read($, limits), cfg, now, 'agent', await suspension($, true))
+  const s = status(await read($, limits), cfg, now, 'agent', await suspension($, cfg, true))
   if (s.level === 'stop' && s.resumeAt && s.resumeAt > now) {
     await update($, guard, g => ({ ...g, paused: s.resumeAt }))
     return armResume($, cfg, s.resumeAt, now)
@@ -99,8 +138,21 @@ async function resume($: EngineInterface, cfg: Config) {
   await $.prompt.submit({ text: RESUME_PROMPT })
 }
 
-/** Nom de la commande, préfixé comme le plugin pour être facile à retrouver : /usage-pace:debloquer. */
-const CMD = 'usage-pace:debloquer'
+/**
+ * /debloquer. Pas de « : » : le moteur refuse ce nom, et tout le démarrage du mod sautait avec.
+ * La version préfixée, /usage-pace-guard:debloquer, est le skill (elle marche aussi dans le cloud).
+ */
+const CMD = 'debloquer'
+const TOOL_PREFIX = 'mcp__usage-pace-guard__'
+
+/** Un enregistrement refusé ne doit pas emporter les autres (ni le reste du démarrage). */
+const quietly = async ($: EngineInterface, what: string, op: Promise<unknown>) => {
+  try {
+    await op
+  } catch (err) {
+    $.ui.log(`usage-pace-guard : ${what} non enregistré (${String(err)})`)
+  }
+}
 
 export const register: Register = (on, options) => {
   const cfg = config(options)
@@ -109,12 +161,19 @@ export const register: Register = (on, options) => {
     const result = await next(e)
     const env = await $.env.get('USAGE_PACE_AGENT')
     forced = env === '1' ? 'agent' : env === '0' ? 'you' : undefined
-    await $.command.register({
-      name: CMD,
-      description: `Lève l’arrêt des agents (quotas) : jusqu’au reset, ou /${CMD} 2h, ou /${CMD} off`,
-    })
-    await $.tool
-      .register({
+    await quietly(
+      $,
+      `/${CMD}`,
+      $.command.register({
+        name: CMD,
+        description: `Lève l’arrêt des agents (quotas) : jusqu’au reset, ou /${CMD} 2h, ou /${CMD} off`,
+        argumentHint: '[2h | off]',
+      }),
+    )
+    await quietly(
+      $,
+      'outil quotas',
+      $.tool.register({
         name: 'quotas',
         description:
           'Lit tes limites d’abonnement Claude (Session 5 h, Semaine 7 j) : % utilisé, quota permis maintenant, ' +
@@ -122,15 +181,28 @@ export const register: Register = (on, options) => {
           'et régulièrement pendant une tâche longue.',
         inputSchema: { type: 'object', properties: {} },
         isDeferred: false,
-      })
-      .catch(() => undefined)
+      }),
+    )
+    await quietly(
+      $,
+      'outil debloquer',
+      $.tool.register({
+        name: 'debloquer',
+        description:
+          'Lève l’arrêt des agents dû aux quotas (ou le réactive). À appeler UNIQUEMENT quand la personne le ' +
+          'demande elle-même dans son message ; jamais de ta propre initiative. duree : vide (jusqu’au reset), ' +
+          '« 2h », « 30min », « 1j », ou « off ».',
+        inputSchema: { type: 'object', properties: { duree: { type: 'string' } } },
+        isDeferred: false,
+      }),
+    )
     const usage = await $.session.usage()
     if (usage.rateLimits.length) await update($, limits, () => usage.rateLimits.map(l => ({ ...l })))
     const paused = (await read($, guard)).paused
     if (paused && cfg.resume) armResume($, cfg, paused, await $.clock.now())
-    // une pause levée par /usage-pace:debloquer dans une autre session
+    // une pause levée par un déblocage posé dans une autre session (ou par le skill)
     $.clock.every(POLL_MS, async () => {
-      if ((await read($, guard)).paused && (await suspension($, true))) await resume($, cfg)
+      if ((await read($, guard)).paused && (await suspension($, cfg, true))) await resume($, cfg)
     })
     return result
   })
@@ -143,11 +215,12 @@ export const register: Register = (on, options) => {
   // qui mène la conversation : toi (message tapé) ou un agent (tâche planifiée, autre session…)
   on('prompt.submit', async ($, e, next) => {
     const kind = e.origin.kind
+    if (!NEUTRAL_ORIGINS.has(kind) && !e.turnId) humanTurn = HUMAN_ORIGINS.has(kind)
     if (!NEUTRAL_ORIGINS.has(kind)) {
       const human = !AGENT_ORIGINS.has(kind)
       // un message d'agent glissé dans ton tour ne te transforme pas en agent
       if (human || !e.turnId) await update($, mode, () => (human ? 'you' : 'agent'))
-      // tu reprends la main : la relance automatique n'a plus lieu d'être (sauf /usage-pace:debloquer, qui relance)
+      // tu reprends la main : la relance automatique n'a plus lieu d'être (sauf /debloquer, qui relance)
       if (human && e.command?.name !== CMD && (await read($, guard)).paused) await clearPause($)
     }
     return next(e)
@@ -157,12 +230,24 @@ export const register: Register = (on, options) => {
     const now = await $.clock.now()
     const who = await modeOf($, e.agentId)
     const list = await read($, limits)
-    const suspended = await suspension($)
-    if (e.tool.startsWith('mcp__usage-pace-guard__')) {
+    const suspended = await suspension($, cfg)
+    const path = await suspensionFile($)
+    const asked = humanTurn && !e.agentId
+    if (e.tool === `${TOOL_PREFIX}debloquer`) {
+      if (!asked) return { deny: REFUSED_UNLOCK }
+      const duree = (e as unknown as { duree?: unknown }).duree
+      return { result: await applyUnlock($, cfg, typeof duree === 'string' ? duree : '') }
+    }
+    if (e.tool.startsWith(TOOL_PREFIX)) {
       return { result: report(list, cfg, now, who, { paused: (await read($, guard)).paused, suspended }) }
     }
+    // le fichier de suspension : seule une demande de la personne peut l'écrire (skill debloquer)
+    const target = (e as unknown as { file_path?: unknown }).file_path
+    if ((e.tool === 'Write' || e.tool === 'Edit') && path && target === path && !asked) {
+      return { deny: REFUSED_UNLOCK }
+    }
     const s = status(list, cfg, now, who, suspended)
-    const deny = denial(e.tool, s, cfg, now)
+    const deny = denial(e.tool, s, cfg, now, path)
     if (deny) {
       await update($, guard, g => ({ ...g, stopped: true }))
       return { deny }
@@ -181,7 +266,7 @@ export const register: Register = (on, options) => {
       const g = await read($, guard)
       await update($, guard, x => ({ ...x, stopped: false }))
       const now = await $.clock.now()
-      const s = status(await read($, limits), cfg, now, 'agent', await suspension($, true))
+      const s = status(await read($, limits), cfg, now, 'agent', await suspension($, cfg, true))
       // ta session ne se met jamais en pause, même si un de tes sous-agents s'est arrêté
       const agent = (await modeOf($)) === 'agent'
       if (agent && g.stopped && cfg.resume && s.level === 'stop' && s.resumeAt) {
@@ -195,30 +280,5 @@ export const register: Register = (on, options) => {
     return next(e)
   })
 
-  on('command.run', { command: CMD }, async ($, e) => {
-    const now = await $.clock.now()
-    const r = unlockUntil(e.args, await read($, limits), cfg, now)
-    if ('error' in r) return { text: r.error }
-    const path = await suspensionFile($)
-    if (!path) return { text: 'Pas de dossier personnel (HOME) où noter la suspension.' }
-    if ('off' in r) {
-      await $.fs.write(path, JSON.stringify({ setAt: now }, null, 2))
-      cache = { at: now }
-      return { text: 'Garde-fou réactivé.' }
-    }
-    const until = r.until
-    await $.fs.write(path, JSON.stringify({ until, setAt: now }, null, 2))
-    cache = { until, at: now }
-    const wasPaused = (await read($, guard)).paused
-    if (wasPaused) {
-      await clearPause($)
-      // pas depuis la commande elle-même (elle tient le tour) : juste après
-      $.clock.after(1000, () => void $.prompt.submit({ text: RESUME_PROMPT }))
-    }
-    return {
-      text:
-        `Garde-fou suspendu jusqu'à ${clock(until)} (${r.why}), pour tous les agents de cette machine. ` +
-        `${wasPaused ? 'La tâche en pause reprend. ' : ''}/${CMD} off pour le réactiver.`,
-    }
-  })
+  on('command.run', { command: CMD }, async ($, e) => ({ text: await applyUnlock($, cfg, e.args) }))
 }

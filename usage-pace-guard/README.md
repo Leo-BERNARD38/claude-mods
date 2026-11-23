@@ -31,7 +31,8 @@ Une session où **tu** travailles n'est jamais bloquée : au plus un rappel.
 Forcer le mode : variable d'environnement `USAGE_PACE_AGENT=1` (toujours agent, par exemple dans
 l'environnement cloud de tes agents ou un script `claude -p`) ou `USAGE_PACE_AGENT=0` (jamais bloqué).
 Une session cloud lancée depuis le web ou par l'API arrive comme « SDK », donc comme toi : pose
-`USAGE_PACE_AGENT=1` dans l'environnement de tes agents.
+`USAGE_PACE_AGENT=1` dans l'environnement de tes agents. Dans un tel environnement, ta propre conversation
+est traitée comme un agent : pour continuer, débloque (voir plus bas).
 
 ## Ce qui se passe
 
@@ -44,16 +45,30 @@ Une session cloud lancée depuis le web ou par l'API arrive comme « SDK », don
 | quota de nouveau permis | la tâche est relancée par un prompt automatique (« relis ton fichier d'avancement »). |
 | tu écris toi-même | la relance prévue est annulée : tu as repris la main. |
 
-## Débloquer à la main : `/usage-pace:debloquer`
+## Débloquer : toi, ou un agent à qui tu le demandes
 
-- `/usage-pace:debloquer` : lève l'arrêt tout de suite, relance la tâche en pause, et suspend le garde-fou jusqu'au
+| Où | Comment |
+| --- | --- |
+| partout (local, cloud, app, téléphone) | `/usage-pace-guard:debloquer` (skill), ou écris à l'agent « débloque le garde-fou » |
+| Claude Code en local | aussi `/debloquer`, la commande rapide (sans passer par le modèle) |
+
+- sans argument : lève l'arrêt tout de suite, relance la tâche en pause, et suspend le garde-fou jusqu'au
   reset de la fenêtre qui bloquait ;
-- `/usage-pace:debloquer 2h` (ou `30min`, `1h30`, `1j`) : pour cette durée ;
-- `/usage-pace:debloquer off` : réactive le garde-fou tout de suite.
+- `2h` (ou `30min`, `1h30`, `1j`) : pour cette durée ;
+- `off` : réactive le garde-fou tout de suite.
+
+Seule une demande de ta part compte : le déblocage est refusé dans un tour lancé par une tâche planifiée,
+une autre session ou un sous-agent. Un agent ne peut donc pas se débloquer tout seul.
 
 La suspension est notée dans `~/.usage-pace/garde-fou.json` : tous les agents de la machine la voient,
 sous-agents compris, et un agent en pause reprend dans les 30 s. L'outil `quotas` affiche
-« Garde-fou suspendu jusqu'à … ». (Une session cloud a son propre disque : lance `/usage-pace:debloquer` dans celle-ci.)
+« Garde-fou suspendu jusqu'à … ». (Une session cloud a son propre disque : débloque dans celle-ci.)
+
+## Pendant une pause
+
+Restent permis : `Write`/`Edit`/`Read`/`Grep`/`Glob`, les tâches, `Skill` et `ToolSearch`, et les outils de
+reprise (`send_later`, `ScheduleWakeup`, tâches programmées). Le refus dit à l'agent de programmer sa reprise :
+une session cloud peut dormir et manquer la relance automatique.
 
 ## Réglages
 
@@ -82,9 +97,10 @@ s'en charge : il copie le mod dans les mods de la session et te demande « Turn 
 
 | Fichier | Rôle |
 | --- | --- |
-| `hooks/guard.ts` | les calculs : seuils, rappel, refus, conseil, `/usage-pace:debloquer` |
-| `hooks/register.ts` | le câblage : mesures, outil `quotas`, mode agent / toi, pause, reprise |
+| `hooks/guard.ts` | les calculs : seuils, rappel, refus, conseil, déblocage |
+| `hooks/register.ts` | le câblage : mesures, outils `quotas` et `debloquer`, `/debloquer`, mode agent / toi, pause, reprise |
 | `skills/quotas/SKILL.md` | charge le garde-fou là où les hooks ne tournent pas (mode projet, Cowork) |
+| `skills/debloquer/SKILL.md` | `/usage-pace-guard:debloquer` : débloquer partout, y compris dans le cloud |
 | `types/index.d.ts` | l'état du mod |
 
 ## Vérifier
