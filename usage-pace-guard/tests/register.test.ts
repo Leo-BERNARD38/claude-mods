@@ -13,7 +13,7 @@ const HIGH = [
 const SUSPENSION = '/home/toi/.usage-pace/garde-fou.json'
 
 /** Ce que Claude Code répondrait, avec un disque en mémoire. */
-function engine(on: On, env: Record<string, string> = {}) {
+function engine(on: On, env: Record<string, string> = {}, register = true) {
   const clock = mock.clock(on, { now: NOW })
   mock.store(on)
   const files: Record<string, string> = {}
@@ -24,8 +24,10 @@ function engine(on: On, env: Record<string, string> = {}) {
     return { value: files[e.path] } as never
   })
   on('fs.write', (_$, e) => ((files[e.path] = e.text), { value: undefined }) as never)
-  on('command.register', () => ({ value: undefined }) as never)
-  on('tool.register', () => ({ value: { tool: 'mcp__usage-pace-guard__quotas' } }) as never)
+  if (register) {
+    on('command.register', () => ({ value: undefined }) as never)
+    on('tool.register', () => ({ value: { tool: 'mcp__usage-pace-guard__quotas' } }) as never)
+  }
   on('session.start', () => ({ cwd: '/projet' }))
   on('session.measure', (_$, e) => ({ changed: e.changed }))
   on('session.usage', () => ({ value: { startedAt: NOW, rateLimits: HIGH, context: {} } }) as never)
@@ -40,7 +42,7 @@ const turn = (id: string) =>
 const prompt = (kind: string) => ({ text: 'go', wait: false, origin: { kind } }) as never
 const debloquer = (args: string) =>
   ({
-    command: 'usage-pace:debloquer',
+    command: 'debloquer',
     args,
     origin: { kind: 'composer' },
     presentation: { isFullscreen: false, columns: 120 },
@@ -84,7 +86,7 @@ test('USAGE_PACE_AGENT=1 : agent même quand le message vient du SDK', async ($,
   expect((await $.tool.call({ tool: 'Bash', command: 'ls' } as never)).deny).toBeDefined()
 })
 
-test('/usage-pace:debloquer : lève l’arrêt tout de suite, relance la tâche en pause ; off le réactive', async ($, on) => {
+test('/debloquer : lève l’arrêt tout de suite, relance la tâche en pause ; off le réactive', async ($, on) => {
   const { clock, files, submitted } = engine(on, { USAGE_PACE_AGENT: '1' })
   await $.session.start({ cwd: '/projet', surface: null, isInteractive: false } as never)
   await $.tool.call({ tool: 'Bash', command: 'ls' } as never)
@@ -104,7 +106,7 @@ test('/usage-pace:debloquer : lève l’arrêt tout de suite, relance la tâche 
   expect((await $.tool.call({ tool: 'Bash', command: 'ls' } as never)).deny).toBeDefined()
 })
 
-test('/usage-pace:debloquer lancé dans une autre session : l’agent en pause reprend sans attendre le reset', async ($, on) => {
+test('/debloquer lancé dans une autre session : l’agent en pause reprend sans attendre le reset', async ($, on) => {
   const { clock, files, submitted } = engine(on, { USAGE_PACE_AGENT: '1' })
   await $.session.start({ cwd: '/projet', surface: null, isInteractive: false } as never)
   await $.tool.call({ tool: 'Bash', command: 'ls' } as never)
@@ -115,4 +117,79 @@ test('/usage-pace:debloquer lancé dans une autre session : l’agent en pause r
   await clock.advance(31_000)
   expect(submitted.length).toBe(before + 1)
   expect((await $.tool.call({ tool: 'Bash', command: 'ls' } as never)).deny).toBeUndefined()
+})
+
+test('le démarrage va au bout : /debloquer et les outils quotas et debloquer sont enregistrés', async ($, on) => {
+  const names: string[] = []
+  engine(on, {}, false)
+  on('command.register', (_$, e) => (names.push(`/${e.name}`), { value: { command: e.name } }) as never)
+  on('tool.register', (_$, e) => (names.push(e.name), { value: { tool: e.name } }) as never)
+  await $.session.start({ cwd: '/projet', surface: 'terminal', isInteractive: true } as never)
+  expect(names.sort()).toEqual(['/debloquer', 'debloquer', 'quotas'])
+})
+
+test('un enregistrement refusé n’emporte pas le reste du démarrage', async ($, on) => {
+  const { clock, files, submitted } = engine(on, { USAGE_PACE_AGENT: '1' }, false)
+  on('command.register', () => {
+    throw new Error('non')
+  })
+  on('tool.register', (_$, e) => ({ value: { tool: e.name } }) as never)
+  await $.session.start({ cwd: '/projet', surface: null, isInteractive: false } as never)
+  await $.tool.call({ tool: 'Bash', command: 'ls' } as never)
+  await $.turn.complete(turn('t1'))
+  const before = submitted.length
+  // la surveillance du déblocage tourne quand même
+  files[SUSPENSION] = JSON.stringify({ until: NOW + 2 * HOUR })
+  await clock.advance(31_000)
+  expect(submitted.length).toBe(before + 1)
+})
+
+test('à l’arrêt, les outils de reprise restent permis : rappel, skill, recherche', async ($, on) => {
+  engine(on, { USAGE_PACE_AGENT: '1' })
+  await $.session.start({ cwd: '/projet', surface: null, isInteractive: false } as never)
+  for (const tool of ['mcp__claude-code-remote__send_later', 'ScheduleWakeup', 'Skill', 'Grep', 'ToolSearch'])
+    expect((await $.tool.call({ tool } as never)).deny).toBeUndefined()
+  const bash = await $.tool.call({ tool: 'Bash', command: 'ls' } as never)
+  expect(String(bash.deny)).toContain('/debloquer')
+  expect(String(bash.deny)).toContain(SUSPENSION)
+})
+
+test('cloud (USAGE_PACE_AGENT=1) : la personne demande, l’agent débloque avec l’outil', async ($, on) => {
+  const { files } = engine(on, { USAGE_PACE_AGENT: '1' })
+  await $.session.start({ cwd: '/projet', surface: null, isInteractive: false } as never)
+  await $.prompt.submit(prompt('sdk'))
+  await $.tool.call({ tool: 'Bash', command: 'ls' } as never)
+  await $.turn.complete(turn('t1'))
+  await $.prompt.submit(prompt('sdk'))
+  const r = await $.tool.call({ tool: 'mcp__usage-pace-guard__debloquer', duree: '2h' } as never)
+  expect(String(r.result)).toContain('Garde-fou suspendu jusqu')
+  expect(JSON.parse(files[SUSPENSION]!).until).toBe(NOW + 2 * HOUR)
+  // la personne est là : pas de relance automatique, l'agent continue dans ce tour
+  expect((await $.tool.call({ tool: 'Bash', command: 'ls' } as never)).deny).toBeUndefined()
+})
+
+test('skill debloquer sans outil : la demande écrite dans le fichier est convertie en heure', async ($, on) => {
+  const { clock, files } = engine(on, { USAGE_PACE_AGENT: '1' })
+  await $.session.start({ cwd: '/projet', surface: null, isInteractive: false } as never)
+  await $.prompt.submit(prompt('bridge'))
+  const w = await $.tool.call({ tool: 'Write', file_path: SUSPENSION, content: '{"demande":"reset"}' } as never)
+  expect(w.deny).toBeUndefined()
+  files[SUSPENSION] = '{"demande":"reset"}'
+  await clock.advance(6000)
+  await $.tool.call({ tool: 'Read', file_path: '/projet/x' } as never)
+  expect(JSON.parse(files[SUSPENSION]!).until).toBe(NOW + HOUR)
+  expect((await $.tool.call({ tool: 'Bash', command: 'ls' } as never)).deny).toBeUndefined()
+})
+
+test('un agent autonome (tâche planifiée, sous-agent) ne peut pas se débloquer lui-même', async ($, on) => {
+  engine(on)
+  await $.session.start({ cwd: '/projet', surface: null, isInteractive: false } as never)
+  await $.prompt.submit(prompt('scheduled-trigger'))
+  const tool = await $.tool.call({ tool: 'mcp__usage-pace-guard__debloquer' } as never)
+  expect(String(tool.deny)).toContain('Déblocage refusé')
+  const write = await $.tool.call({ tool: 'Write', file_path: SUSPENSION, content: '{}' } as never)
+  expect(String(write.deny)).toContain('Déblocage refusé')
+  await $.prompt.submit(prompt('composer'))
+  const sub = await $.tool.call({ tool: 'mcp__usage-pace-guard__debloquer', agentId: 'a1' } as never)
+  expect(String(sub.deny)).toContain('Déblocage refusé')
 })

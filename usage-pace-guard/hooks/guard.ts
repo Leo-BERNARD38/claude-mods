@@ -41,7 +41,7 @@ export type Status = {
   worst?: Window
   /** à l'arrêt : quand reprendre (ms epoch) */
   resumeAt?: number
-  /** /usage-pace:debloquer : garde-fou suspendu jusqu'à (ms epoch) */
+  /** /debloquer : garde-fou suspendu jusqu'à (ms epoch) */
   suspended?: number
 }
 
@@ -59,15 +59,32 @@ export const WARN_BEFORE = 5
 export const REMIND_EVERY = 15
 /** Laisser au serveur le temps de rouvrir la fenêtre avant de relancer. */
 const RESUME_MARGIN = 2 * MIN
-/** Ce qui reste permis à l'arrêt : de quoi noter où on en est. */
+/**
+ * Ce qui reste permis à l'arrêt : de quoi noter où on en est, relire, et préparer la reprise
+ * (rappels, réveils, tâches programmées), et charger le skill debloquer quand la personne le demande.
+ */
 const ALLOWED_WHEN_STOPPED = new Set([
   'Write',
   'Edit',
   'Read',
+  'Grep',
+  'Glob',
   'TodoWrite',
   'TaskCreate',
   'TaskUpdate',
   'TaskList',
+  'TaskGet',
+  'Skill',
+  'ToolSearch',
+  'ScheduleWakeup',
+  'CronCreate',
+  'CronList',
+  'CronDelete',
+  'ReadNotifications',
+  'mcp__claude-code-remote__send_later',
+  'mcp__claude-code-remote__list_triggers',
+  'mcp__claude-code-remote__get_trigger',
+  'mcp__claude-code-remote__delete_trigger',
 ])
 
 export function config(options: Readonly<Record<string, unknown>>): Config {
@@ -172,20 +189,32 @@ export function reminder(s: Status, mode: Mode): string {
 }
 
 /** Le refus d'un outil à l'arrêt, ou null s'il reste permis. */
-export function denial(tool: string, s: Status, cfg: Config, now: number): string | null {
-  if (s.level !== 'stop' || ALLOWED_WHEN_STOPPED.has(tool) || tool.endsWith('__quotas')) return null
+export function denial(tool: string, s: Status, cfg: Config, now: number, file?: string): string | null {
+  if (s.level !== 'stop' || ALLOWED_WHEN_STOPPED.has(tool) || tool.startsWith('mcp__usage-pace-guard__'))
+    return null
   const w = s.worst!
   const resume = s.resumeAt
     ? cfg.resume
       ? ` Reprise automatique prévue ${when(s.resumeAt, now)}.`
       : ` Le quota le permet de nouveau ${when(s.resumeAt, now)}.`
     : ''
+  const wake = s.resumeAt
+    ? ` Avant de finir, programme ta reprise vers ${clock(s.resumeAt)} si un outil de rappel existe ` +
+      `(send_later, ScheduleWakeup) : une session cloud peut dormir et manquer la relance.`
+    : ''
   return (
     `[usage-pace] Pause : quota ${w.label} à ${pct(w.used)}, permis maintenant ${pct(w.stopAt)}. ` +
     `Les outils sont suspendus pour garder de la marge. Note l'avancement dans un fichier (Write/Edit ` +
-    `restent permis), puis termine ta réponse par un court point d'étape.${resume}`
+    `restent permis), puis termine ta réponse par un court point d'étape.${resume}${wake} ` +
+    `Seule la personne peut lever l'arrêt : /debloquer, ou /usage-pace-guard:debloquer, ou en te le ` +
+    `demandant (skill debloquer${file ? `, fichier ${file}` : ''}). Ne le fais jamais de toi-même.`
   )
 }
+
+export const REFUSED_UNLOCK =
+  `[usage-pace] Déblocage refusé : seule la personne peut lever l'arrêt, dans un message qu'elle a tapé ` +
+  `elle-même (pas une tâche planifiée, une autre session ni un sous-agent). Dis-lui de lancer /debloquer ` +
+  `ou de te le demander.`
 
 export const RESUME_PROMPT =
   `[usage-pace] Le quota le permet de nouveau. Reprends la tâche en cours là où tu t'étais arrêté : ` +
@@ -229,7 +258,7 @@ export function report(
     ...lines,
     `${who} ${rules}`,
     ...(s.suspended
-      ? [`Garde-fou suspendu jusqu'à ${clock(s.suspended)} (/usage-pace:debloquer off pour le réactiver).`]
+      ? [`Garde-fou suspendu jusqu'à ${clock(s.suspended)} (/debloquer off pour le réactiver).`]
       : []),
     ...(extra.paused ? [`En pause, relance prévue ${clock(extra.paused)}.`] : []),
   ].join('\n')
@@ -248,7 +277,7 @@ export function parseDuration(text: string): number | null {
 }
 
 /**
- * /usage-pace:debloquer : jusqu'à quand suspendre le garde-fou.
+ * /debloquer : jusqu'à quand suspendre le garde-fou.
  * Sans argument : jusqu'au reset de la fenêtre qui bloque (ou qui rappelle, sinon la Session).
  */
 export function unlockUntil(

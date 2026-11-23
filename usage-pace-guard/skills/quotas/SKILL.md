@@ -51,4 +51,7 @@ S'il est là, appelle-le, réponds avec ses chiffres et va à l'étape 3. Ne cop
 - Rappel `[usage-pace]` dans les résultats d'outils : ralentis, pas de nouveau lot de sous-agents.
 - Refus `[usage-pace] Pause` : mets le fichier d'avancement à jour, puis arrête-toi avec un court point
   d'étape. Le garde-fou relance la tâche quand le quota le permet ; à la relance, relis le fichier d'avancement.
-- Ne contourne jamais un refus : seule la personne peut lever l'arrêt, avec `/usage-pace:debloquer`.
+- Refus `[usage-pace] Pause` avec une heure de reprise : programme ta reprise (send_later, ScheduleWakeup)
+  si l'outil existe, une session cloud peut dormir et manquer la relance.
+- Ne contourne jamais un refus : seule la personne peut lever l'arrêt, avec `/debloquer`,
+  `/usage-pace-guard:debloquer`, ou en te le demandant (skill `debloquer`).
