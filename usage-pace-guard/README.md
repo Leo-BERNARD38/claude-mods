@@ -92,6 +92,8 @@ Ou à la main depuis ce dossier : `sh install.sh` (macOS / Linux) ou `install.ps
 
 **Mode projet / Cowork** : l'app y charge les skills des plugins, pas leurs hooks. Le skill `quotas`
 s'en charge : il copie le mod dans les mods de la session et te demande « Turn them on » (une fois par session).
+Les quotas arrivent avec les réponses du modèle : dans une session neuve, l'outil `quotas` répond souvent
+« Pas encore de mesure » au 1er tour, et donne les chiffres au 2e.
 
 ## Fichiers
 

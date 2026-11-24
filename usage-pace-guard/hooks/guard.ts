@@ -230,7 +230,12 @@ export function report(
 ): string {
   const list = windows(limits, cfg, now)
   if (!list.length)
-    return 'Pas encore de mesure des limites (pas d’abonnement Pro/Max, ou aucune réponse reçue).'
+    return (
+      'Pas encore de mesure des limites : le mod les reçoit avec les réponses du modèle, il lui en faut une ' +
+      'complète après son chargement (souvent 2 tours dans une session neuve, en mode projet ou Cowork). ' +
+      'Finis ce tour, puis rappelle quotas au suivant. Toujours rien après 2 tours : pas d’abonnement Pro/Max, ' +
+      'ou cette surface ne transmet pas les limites.'
+    )
   const lines = list.map(w => {
     const reset = w.resetAt && w.resetAt > now ? `, reset ${when(w.resetAt, now)}` : ''
     const room = w.stopAt - w.used
