@@ -1,6 +1,6 @@
 {
   "name": "usage-pace-guard",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Garde-fou des quotas pour les agents : Claude lit ses limites, ralentit, s'arrête au quota permis et reprend tout seul. Ne bloque jamais une session où tu travailles.",
   "author": { "name": "Léo" },
   "types": "./types/index.d.ts",

@@ -21,6 +21,12 @@ de la session, une fois par session.
 Cherche `mcp__usage-pace-guard__quotas` (dans la liste des outils, ou avec ToolSearch, requête « quotas »).
 S'il est là, appelle-le, réponds avec ses chiffres et va à l'étape 3. Ne copie rien : le mod tourne déjà.
 
+S'il répond « Pas encore de mesure » : c'est normal juste après le chargement du mod (session neuve, mode
+projet, Cowork). Il reçoit les limites avec les réponses du modèle et il lui en faut une complète : souvent
+2 tours. Ne conclus pas qu'il est cassé, ne recopie pas le mod. Dis-le en une phrase, finis ton tour, et
+rappelle `quotas` au tour suivant (ou programme-toi un rappel avec send_later / ScheduleWakeup si tu tournes
+seul). Toujours rien après 2 tours : dis que cette session ne transmet pas les limites, et va au point 6.
+
 ## 2. Sinon : charger le mod dans cette session
 
 1. Charge le skill `plugin-authoring` avec l'outil Skill. Son texte nomme le dossier des mods de la session
@@ -39,7 +45,7 @@ S'il est là, appelle-le, réponds avec ses chiffres et va à l'étape 3. Ne cop
 4. Dis à la personne, en une phrase : « Réponds “Turn them on” à la question qui s'affiche : c'est ce qui
    charge le garde-fou quotas dans cette session. » La question n'apparaît qu'une fois par session.
 5. Le mod se charge à la fin de ton tour : un avis te le dit, et l'outil `mcp__usage-pace-guard__quotas` arrive.
-   Appelle-le alors et donne les chiffres. Si la personne refuse, ne repose pas la question.
+   Appelle-le alors et donne les chiffres. Les premiers chiffres arrivent souvent au 2e tour (voir l'étape 1). Si la personne refuse, ne repose pas la question.
 6. Sans le mod, tu ne peux pas lire les quotas : dis-le simplement, et propose de lire la page
    Paramètres > Utilisation de claude.ai dans le navigateur.
 
